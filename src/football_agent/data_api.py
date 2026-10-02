@@ -50,8 +50,12 @@ class FootballDataClient:
         self.http = http
         self.cache = cache
 
-    def get_standings(self, competition: str) -> dict[str, Any]:
-        return self._get(f"/competitions/{competition}/standings", {})
+    def get_standings(self, competition: str, season: int | None = None) -> dict[str, Any]:
+        params = {} if season is None else {"season": season}
+        return self._get(f"/competitions/{competition}/standings", params)
+
+    def get_teams(self, competition: str) -> dict[str, Any]:
+        return self._get(f"/competitions/{competition}/teams", {})
 
     def get_matches(self, competition: str, date_from: date, date_to: date) -> dict[str, Any]:
         params = {"dateFrom": date_from.isoformat(), "dateTo": date_to.isoformat()}
