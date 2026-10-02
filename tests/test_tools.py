@@ -1,11 +1,27 @@
 from typing import Any
 
+import pytest
+
 from football_agent.tools import (
+    find_team,
     format_score,
+    match_result,
+    normalize_name,
     summarize_match,
     summarize_matches,
     summarize_standings,
+    summarize_team_form,
 )
+
+TEAMS = [
+    {"id": 524, "name": "Paris Saint-Germain FC", "shortName": "PSG"},
+    {"id": 1045, "name": "Paris FC", "shortName": "Paris FC"},
+    {"id": 523, "name": "Olympique Lyonnais", "shortName": "Olympique Lyon"},
+    {"id": 516, "name": "Olympique de Marseille", "shortName": "Marseille"},
+    {"id": 527, "name": "AS Saint-Étienne", "shortName": "Saint-Étienne"},
+    {"id": 98, "name": "AC Milan", "shortName": "Milan"},
+    {"id": 108, "name": "FC Internazionale Milano", "shortName": "Inter"},
+]
 
 
 def make_match(
@@ -117,3 +133,63 @@ def test_summarize_matches_summarizes_every_match() -> None:
         ("Paris FC", "Strasbourg"),
         ("PSG", "Monaco"),
     ]
+
+
+def test_normalize_name_ignores_case_accents_and_surrounding_spaces() -> None:
+    assert normalize_name("  Saint-Étienne ") == "saint-etienne"
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_id"),
+    [
+        ("PSG", 524),
+        ("paris saint-germain fc", 524),
+        ("Paris FC", 1045),
+        ("saint-etienne", 527),
+        ("Lyon", 523),
+        ("Milan", 98),
+    ],
+)
+def test_find_team_returns_the_only_matching_team(query: str, expected_id: int) -> None:
+    assert find_team(TEAMS, query)["id"] == expected_id
+
+
+def test_find_team_rejects_ambiguous_name_and_lists_candidates() -> None:
+    with pytest.raises(ValueError, match="several teams: PSG, Paris FC"):
+        find_team(TEAMS, "Paris")
+
+
+def test_find_team_rejects_unknown_name_and_lists_available_teams() -> None:
+    with pytest.raises(ValueError, match="No team matches 'OM'. Available teams: PSG, Paris FC"):
+        find_team(TEAMS, "OM")
+
+
+@pytest.mark.parametrize(
+    ("winner", "team_id", "expected"),
+    [
+        ("HOME_TEAM", 1045, "W"),
+        ("HOME_TEAM", 576, "L"),
+        ("AWAY_TEAM", 576, "W"),
+        ("DRAW", 1045, "D"),
+    ],
+)
+def test_match_result_is_seen_from_the_given_team(winner: str, team_id: int, expected: str) -> None:
+    match = make_match("Paris FC", "Strasbourg", {"home": 0, "away": 0}, "FINISHED")
+    match["score"]["winner"] = winner
+
+    assert match_result(match, team_id) == expected
+
+
+def test_summarize_team_form_builds_form_in_match_order() -> None:
+    win = make_match("Paris FC", "Strasbourg", {"home": 2, "away": 1}, "FINISHED")
+    win["score"]["winner"] = "HOME_TEAM"
+    loss = make_match("Paris FC", "Monaco", {"home": 0, "away": 3}, "FINISHED")
+    loss["score"]["winner"] = "AWAY_TEAM"
+    paris_fc = {"id": 1045, "name": "Paris FC", "shortName": "Paris FC"}
+
+    form = summarize_team_form({"matches": [win, loss]}, paris_fc)
+
+    assert form["team"] == "Paris FC"
+    assert form["form"] == "WL"
+    assert [match["result"] for match in form["matches"]] == ["W", "L"]
+    assert form["matches"][0]["score"] == "2-1"
