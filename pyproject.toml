@@ -1,0 +1,33 @@
+[project]
+name = "football-agent"
+version = "0.1.0"
+description = "LLM agent answering questions about European football by calling tools"
+readme = "README.md"
+authors = [
+    { name = "alexandrebertot", email = "bertotalexandre82@gmail.com" }
+]
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "httpx>=0.28.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.21,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
