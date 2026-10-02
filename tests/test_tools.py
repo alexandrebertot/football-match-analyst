@@ -1,10 +1,20 @@
+import inspect
+import sqlite3
 from typing import Any
 
+import httpx
 import pytest
 
+from football_agent.data_api import BASE_URL, FootballDataClient
 from football_agent.tools import (
+    TOOL_FUNCTIONS,
+    TOOL_SCHEMAS,
+    call_tool,
     find_team,
     format_score,
+    get_matches,
+    get_standings,
+    get_team_form,
     match_result,
     normalize_name,
     summarize_match,
@@ -12,6 +22,29 @@ from football_agent.tools import (
     summarize_standings,
     summarize_team_form,
 )
+
+STANDINGS = {
+    "standings": [
+        {
+            "type": "TOTAL",
+            "table": [
+                {
+                    "position": 1,
+                    "team": {"id": 548, "name": "AS Monaco FC", "shortName": "Monaco"},
+                    "playedGames": 5,
+                    "form": None,
+                    "won": 4,
+                    "draw": 1,
+                    "lost": 0,
+                    "points": 13,
+                    "goalsFor": 8,
+                    "goalsAgainst": 3,
+                    "goalDifference": 5,
+                }
+            ],
+        }
+    ]
+}
 
 TEAMS = [
     {"id": 524, "name": "Paris Saint-Germain FC", "shortName": "PSG"},
@@ -53,30 +86,7 @@ def test_format_score_returns_none_for_unplayed_match() -> None:
 
 
 def test_summarize_standings_keeps_only_useful_fields() -> None:
-    raw = {
-        "standings": [
-            {
-                "type": "TOTAL",
-                "table": [
-                    {
-                        "position": 1,
-                        "team": {"id": 548, "name": "AS Monaco FC", "shortName": "Monaco"},
-                        "playedGames": 5,
-                        "form": None,
-                        "won": 4,
-                        "draw": 1,
-                        "lost": 0,
-                        "points": 13,
-                        "goalsFor": 8,
-                        "goalsAgainst": 3,
-                        "goalDifference": 5,
-                    }
-                ],
-            }
-        ]
-    }
-
-    assert summarize_standings(raw) == [
+    assert summarize_standings(STANDINGS) == [
         {
             "position": 1,
             "team": "Monaco",
@@ -193,3 +203,105 @@ def test_summarize_team_form_builds_form_in_match_order() -> None:
     assert form["form"] == "WL"
     assert [match["result"] for match in form["matches"]] == ["W", "L"]
     assert form["matches"][0]["score"] == "2-1"
+
+
+def api_client(
+    cache: sqlite3.Connection, responses: dict[str, Any], requests: list[httpx.Request]
+) -> FootballDataClient:
+    """Return a client backed by a fake API that answers each URL path with `responses[path]`."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=responses[request.url.path])
+
+    http = httpx.Client(base_url=BASE_URL, transport=httpx.MockTransport(handle))
+    return FootballDataClient(http, cache)
+
+
+def test_get_standings_tool_returns_summarized_table_of_requested_season(
+    cache: sqlite3.Connection,
+) -> None:
+    requests: list[httpx.Request] = []
+    client = api_client(cache, {"/v4/competitions/FL1/standings": STANDINGS}, requests)
+
+    table = get_standings(client, "FL1", season=2025)
+
+    assert table == summarize_standings(STANDINGS)
+    assert requests[0].url.params["season"] == "2025"
+
+
+def test_get_matches_tool_converts_iso_dates(cache: sqlite3.Connection) -> None:
+    requests: list[httpx.Request] = []
+    finished = make_match("Paris FC", "Strasbourg", {"home": 2, "away": 1}, "FINISHED")
+    client = api_client(cache, {"/v4/competitions/FL1/matches": {"matches": [finished]}}, requests)
+
+    matches = get_matches(client, "FL1", "2026-09-19", "2026-09-20")
+
+    assert matches == [summarize_match(finished)]
+    assert requests[0].url.params["dateFrom"] == "2026-09-19"
+    assert requests[0].url.params["dateTo"] == "2026-09-20"
+
+
+def test_get_matches_tool_rejects_malformed_date_before_calling_api(
+    cache: sqlite3.Connection,
+) -> None:
+    requests: list[httpx.Request] = []
+    client = api_client(cache, {}, requests)
+
+    with pytest.raises(ValueError):
+        get_matches(client, "FL1", "19 septembre", "2026-09-20")
+
+    assert requests == []
+
+
+def test_get_team_form_tool_finds_team_and_filters_on_competition(
+    cache: sqlite3.Connection,
+) -> None:
+    requests: list[httpx.Request] = []
+    win = make_match("Paris FC", "Strasbourg", {"home": 2, "away": 1}, "FINISHED")
+    win["score"]["winner"] = "HOME_TEAM"
+    responses = {
+        "/v4/competitions/FL1/teams": {"teams": TEAMS},
+        "/v4/teams/1045/matches": {"matches": [win]},
+    }
+    client = api_client(cache, responses, requests)
+
+    form = get_team_form(client, "paris fc", "FL1", last_n=3)
+
+    assert form["team"] == "Paris FC"
+    assert form["form"] == "W"
+    assert requests[1].url.params["competitions"] == "FL1"
+    assert requests[1].url.params["limit"] == "3"
+
+
+def test_call_tool_runs_the_tool_with_llm_arguments(cache: sqlite3.Connection) -> None:
+    requests: list[httpx.Request] = []
+    client = api_client(cache, {"/v4/competitions/FL1/standings": STANDINGS}, requests)
+
+    result = call_tool(client, "get_standings", {"competition": "FL1"})
+
+    assert result == summarize_standings(STANDINGS)
+
+
+def test_call_tool_rejects_unknown_tool_and_lists_available_ones(
+    cache: sqlite3.Connection,
+) -> None:
+    client = api_client(cache, {}, [])
+
+    with pytest.raises(ValueError, match="Unknown tool 'get_odds'. Available tools: get_standings"):
+        call_tool(client, "get_odds", {})
+
+
+@pytest.mark.parametrize("schema", TOOL_SCHEMAS, ids=lambda schema: schema["function"]["name"])
+def test_tool_schema_matches_its_python_function(schema: dict[str, Any]) -> None:
+    function_schema = schema["function"]
+    parameters = inspect.signature(TOOL_FUNCTIONS[function_schema["name"]]).parameters
+    llm_parameters = {name: p for name, p in parameters.items() if name != "client"}
+    required = {name for name, p in llm_parameters.items() if p.default is inspect.Parameter.empty}
+
+    assert set(function_schema["parameters"]["properties"]) == set(llm_parameters)
+    assert set(function_schema["parameters"]["required"]) == required
+
+
+def test_every_tool_function_has_a_schema() -> None:
+    assert [schema["function"]["name"] for schema in TOOL_SCHEMAS] == list(TOOL_FUNCTIONS)

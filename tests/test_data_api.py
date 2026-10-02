@@ -1,7 +1,5 @@
 import sqlite3
-from collections.abc import Iterator
 from datetime import date
-from pathlib import Path
 
 import httpx
 import pytest
@@ -11,17 +9,9 @@ from football_agent.data_api import (
     CACHE_TTL_SECONDS,
     FootballDataClient,
     make_http_client,
-    open_cache,
     read_cache,
     write_cache,
 )
-
-
-@pytest.fixture
-def cache(tmp_path: Path) -> Iterator[sqlite3.Connection]:
-    db = open_cache(tmp_path / "cache" / "responses.sqlite")
-    yield db
-    db.close()
 
 
 def test_read_cache_returns_data_within_ttl(cache: sqlite3.Connection) -> None:
@@ -120,14 +110,17 @@ def test_get_matches_sends_date_range(cache: sqlite3.Connection) -> None:
     assert requests[0].url.params["dateTo"] == "2026-10-07"
 
 
-def test_get_team_matches_requests_last_finished_matches(cache: sqlite3.Connection) -> None:
+def test_get_team_matches_requests_last_finished_matches_of_competition(
+    cache: sqlite3.Connection,
+) -> None:
     requests: list[httpx.Request] = []
     client = fake_client(cache, requests)
 
-    client.get_team_matches(524, limit=5)
+    client.get_team_matches(524, "FL1", limit=5)
 
     assert requests[0].url.path == "/v4/teams/524/matches"
     assert requests[0].url.params["status"] == "FINISHED"
+    assert requests[0].url.params["competitions"] == "FL1"
     assert requests[0].url.params["limit"] == "5"
 
 
