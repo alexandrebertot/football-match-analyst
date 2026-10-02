@@ -27,7 +27,7 @@ notebooks/         # exploration only, never imported by src/
 
 ## Commands
 
-- Install: `uv sync`
+- Install: `uv sync && uv run pre-commit install`
 - Lint and format: `uv run ruff check --fix . && uv run ruff format .`
 - Tests: `uv run pytest`
 - API: `uv run uvicorn football_agent.app:app --reload`
