@@ -94,8 +94,8 @@ def make_tool_call(name: str, arguments: str) -> ChatCompletionMessageToolCall:
     )
 
 
-def test_build_system_prompt_gives_today_date() -> None:
-    assert "Today is 2026-10-03." in build_system_prompt(TODAY)
+def test_build_system_prompt_gives_today_weekday_and_date() -> None:
+    assert "Today is Saturday 2026-10-03." in build_system_prompt(TODAY)
 
 
 def test_run_tool_call_returns_tool_result_as_json(cache: sqlite3.Connection) -> None:

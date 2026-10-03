@@ -8,7 +8,7 @@ from openai.types.chat import ChatCompletionMessageToolCall
 
 from football_agent.data_api import FootballDataClient
 from football_agent.llm import MODEL
-from football_agent.tools import TOOL_SCHEMAS, call_tool
+from football_agent.tools import TOOL_SCHEMAS, WEEKDAYS, call_tool
 
 MAX_TOOL_ROUNDS = 5
 
@@ -16,7 +16,7 @@ MAX_TOOL_ROUNDS = 5
 def build_system_prompt(today: date) -> str:
     return (
         "You are a football assistant for the top 5 European leagues and the Champions League. "
-        f"Today is {today.isoformat()}. "
+        f"Today is {WEEKDAYS[today.weekday()]} {today.isoformat()}. "
         "Always use the tools to get scores, fixtures, standings and team form; "
         "never answer them from memory. "
         "If a tool returns an error, fix the arguments and try again. "
