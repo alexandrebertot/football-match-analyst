@@ -1,0 +1,5 @@
+FROM qwen3.5:9b
+
+# The largest measured conversation (full Champions League table) uses about 5,100 tokens.
+# 8192 keeps the model 100% on an 8 GB GPU; 16384 spills to the CPU and slows generation.
+PARAMETER num_ctx 8192

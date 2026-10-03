@@ -1,7 +1,7 @@
 from openai import OpenAI
 
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
-MODEL = "qwen3.5:9b"
+MODEL = "football-qwen"
 
 
 def make_llm_client() -> OpenAI:
