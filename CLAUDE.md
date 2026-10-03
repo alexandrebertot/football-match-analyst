@@ -28,6 +28,7 @@ notebooks/         # exploration only, never imported by src/
 ## Commands
 
 - Install: `uv sync && uv run pre-commit install`
+- LLM (once, and after editing the Modelfile): `ollama create football-qwen -f ollama/Modelfile`
 - Lint and format: `uv run ruff check --fix . && uv run ruff format .`
 - Tests: `uv run pytest`
 - API: `uv run uvicorn football_agent.app:app --reload`
