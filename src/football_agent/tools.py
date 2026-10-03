@@ -11,29 +11,44 @@ def format_score(score: dict[str, int | None]) -> str | None:
     return f"{score['home']}-{score['away']}"
 
 
-def summarize_standings(raw: dict[str, Any]) -> list[dict[str, Any]]:
+def season_label(start_date: str) -> str:
+    """Return the season label, e.g. '2026-27' for a season starting on '2026-08-22'."""
+    start_year = date.fromisoformat(start_date).year
+    return f"{start_year}-{(start_year + 1) % 100:02d}"
+
+
+def summarize_standings(raw: dict[str, Any]) -> dict[str, Any]:
     # Leagues and the Champions League league phase both come back as a single total table.
     table = raw["standings"][0]["table"]
-    return [
-        {
-            "position": row["position"],
-            "team": row["team"]["shortName"],
-            "played": row["playedGames"],
-            "won": row["won"],
-            "draw": row["draw"],
-            "lost": row["lost"],
-            "goals_for": row["goalsFor"],
-            "goals_against": row["goalsAgainst"],
-            "goal_difference": row["goalDifference"],
-            "points": row["points"],
-        }
-        for row in table
-    ]
+    return {
+        "competition": raw["competition"]["name"],
+        "season": season_label(raw["season"]["startDate"]),
+        "table": [
+            {
+                "position": row["position"],
+                "team": row["team"]["shortName"],
+                "played": row["playedGames"],
+                "won": row["won"],
+                "drawn": row["draw"],
+                "lost": row["lost"],
+                "goals_for": row["goalsFor"],
+                "goals_against": row["goalsAgainst"],
+                "goal_difference": row["goalDifference"],
+                "points": row["points"],
+            }
+            for row in table
+        ],
+    }
+
+
+WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
 def summarize_match(match: dict[str, Any]) -> dict[str, Any]:
+    kickoff_date = date.fromisoformat(match["utcDate"][:10])
     return {
-        "date": match["utcDate"][:10],
+        "date": kickoff_date.isoformat(),
+        "weekday": WEEKDAYS[kickoff_date.weekday()],
         "competition": match["competition"]["code"],
         "matchday": match["matchday"],
         "home": match["homeTeam"]["shortName"],
@@ -81,6 +96,9 @@ def find_team(teams: list[dict[str, Any]], name: str) -> dict[str, Any]:
     raise ValueError(f"No team matches '{name}'. Available teams: {available}.")
 
 
+RESULT_POINTS = {"W": 3, "D": 1, "L": 0}
+
+
 def match_result(match: dict[str, Any], team_id: int) -> str:
     """Return 'W', 'D' or 'L' for the team `team_id` in a finished match."""
     winner = match["score"]["winner"]
@@ -95,16 +113,22 @@ def summarize_team_form(raw: dict[str, Any], team: dict[str, Any]) -> dict[str, 
         {**summarize_match(match), "result": match_result(match, team["id"])}
         for match in raw["matches"]
     ]
+    results = [match["result"] for match in matches]
     return {
         "team": team["shortName"],
-        "form": "".join(match["result"] for match in matches),
+        "played": len(results),
+        "won": results.count("W"),
+        "drawn": results.count("D"),
+        "lost": results.count("L"),
+        "points": sum(RESULT_POINTS[result] for result in results),
+        "form": "".join(results),
         "matches": matches,
     }
 
 
 def get_standings(
     client: FootballDataClient, competition: str, season: int | None = None
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     return summarize_standings(client.get_standings(competition, season))
 
 
@@ -147,8 +171,9 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "get_standings",
             "description": (
-                "Get the league table of a competition: position, points, wins, draws, losses "
-                "and goals of every team. For the Champions League, this is the league phase table."
+                "Get the league table of a competition and the season it belongs to (e.g. "
+                "'2026-27'): position, points, wins, draws, losses and goals of every team. "
+                "For the Champions League, this is the league phase table."
             ),
             "parameters": {
                 "type": "object",
@@ -171,8 +196,8 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "get_matches",
             "description": (
-                "Get the matches of a competition between two dates, both included: "
-                "final and half-time scores of finished matches, status of upcoming ones."
+                "Get the matches of a competition between two dates, both included: date and "
+                "weekday, final and half-time scores of finished matches, status of upcoming ones."
             ),
             "parameters": {
                 "type": "object",
@@ -190,8 +215,9 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "get_team_form",
             "description": (
-                "Get the last results of a team in a competition: a form string such as 'WWDLW' "
-                "(W = win, D = draw, L = loss, oldest match first) and the detail of each match."
+                "Get the last results of a team in a competition: matches played, won, drawn and "
+                "lost, points earned, a form string such as 'WWDLW' (W = win, D = draw, L = loss, "
+                "oldest match first) and the detail of each match."
             ),
             "parameters": {
                 "type": "object",
