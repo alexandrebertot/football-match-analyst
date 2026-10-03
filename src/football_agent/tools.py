@@ -41,9 +41,14 @@ def summarize_standings(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+
 def summarize_match(match: dict[str, Any]) -> dict[str, Any]:
+    kickoff_date = date.fromisoformat(match["utcDate"][:10])
     return {
-        "date": match["utcDate"][:10],
+        "date": kickoff_date.isoformat(),
+        "weekday": WEEKDAYS[kickoff_date.weekday()],
         "competition": match["competition"]["code"],
         "matchday": match["matchday"],
         "home": match["homeTeam"]["shortName"],
@@ -191,8 +196,8 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "get_matches",
             "description": (
-                "Get the matches of a competition between two dates, both included: "
-                "final and half-time scores of finished matches, status of upcoming ones."
+                "Get the matches of a competition between two dates, both included: date and "
+                "weekday, final and half-time scores of finished matches, status of upcoming ones."
             ),
             "parameters": {
                 "type": "object",

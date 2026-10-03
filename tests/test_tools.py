@@ -123,6 +123,7 @@ def test_summarize_match_keeps_only_useful_fields() -> None:
 
     assert summarize_match(match) == {
         "date": "2026-09-19",
+        "weekday": "Saturday",
         "competition": "FL1",
         "matchday": 5,
         "home": "Paris FC",
@@ -132,6 +133,21 @@ def test_summarize_match_keeps_only_useful_fields() -> None:
         "duration": "REGULAR",
         "status": "FINISHED",
     }
+
+
+@pytest.mark.parametrize(
+    ("utc_date", "weekday"),
+    [
+        ("2026-09-21T19:00:00Z", "Monday"),
+        ("2026-09-19T15:15:00Z", "Saturday"),
+        ("2026-09-20T19:45:00Z", "Sunday"),
+    ],
+)
+def test_summarize_match_gives_weekday_of_kickoff_date(utc_date: str, weekday: str) -> None:
+    match = make_match("PSG", "Monaco", {"home": 1, "away": 0}, "FINISHED")
+    match["utcDate"] = utc_date
+
+    assert summarize_match(match)["weekday"] == weekday
 
 
 def test_summarize_match_of_unplayed_match_has_no_score() -> None:
