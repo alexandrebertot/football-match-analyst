@@ -11,24 +11,34 @@ def format_score(score: dict[str, int | None]) -> str | None:
     return f"{score['home']}-{score['away']}"
 
 
-def summarize_standings(raw: dict[str, Any]) -> list[dict[str, Any]]:
+def season_label(start_date: str) -> str:
+    """Return the season label, e.g. '2026-27' for a season starting on '2026-08-22'."""
+    start_year = date.fromisoformat(start_date).year
+    return f"{start_year}-{(start_year + 1) % 100:02d}"
+
+
+def summarize_standings(raw: dict[str, Any]) -> dict[str, Any]:
     # Leagues and the Champions League league phase both come back as a single total table.
     table = raw["standings"][0]["table"]
-    return [
-        {
-            "position": row["position"],
-            "team": row["team"]["shortName"],
-            "played": row["playedGames"],
-            "won": row["won"],
-            "draw": row["draw"],
-            "lost": row["lost"],
-            "goals_for": row["goalsFor"],
-            "goals_against": row["goalsAgainst"],
-            "goal_difference": row["goalDifference"],
-            "points": row["points"],
-        }
-        for row in table
-    ]
+    return {
+        "competition": raw["competition"]["name"],
+        "season": season_label(raw["season"]["startDate"]),
+        "table": [
+            {
+                "position": row["position"],
+                "team": row["team"]["shortName"],
+                "played": row["playedGames"],
+                "won": row["won"],
+                "drawn": row["draw"],
+                "lost": row["lost"],
+                "goals_for": row["goalsFor"],
+                "goals_against": row["goalsAgainst"],
+                "goal_difference": row["goalDifference"],
+                "points": row["points"],
+            }
+            for row in table
+        ],
+    }
 
 
 def summarize_match(match: dict[str, Any]) -> dict[str, Any]:
@@ -113,7 +123,7 @@ def summarize_team_form(raw: dict[str, Any], team: dict[str, Any]) -> dict[str, 
 
 def get_standings(
     client: FootballDataClient, competition: str, season: int | None = None
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     return summarize_standings(client.get_standings(competition, season))
 
 
@@ -156,8 +166,9 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "get_standings",
             "description": (
-                "Get the league table of a competition: position, points, wins, draws, losses "
-                "and goals of every team. For the Champions League, this is the league phase table."
+                "Get the league table of a competition and the season it belongs to (e.g. "
+                "'2026-27'): position, points, wins, draws, losses and goals of every team. "
+                "For the Champions League, this is the league phase table."
             ),
             "parameters": {
                 "type": "object",

@@ -17,6 +17,7 @@ from football_agent.tools import (
     get_team_form,
     match_result,
     normalize_name,
+    season_label,
     summarize_match,
     summarize_matches,
     summarize_standings,
@@ -24,6 +25,8 @@ from football_agent.tools import (
 )
 
 STANDINGS = {
+    "competition": {"code": "FL1", "name": "Ligue 1"},
+    "season": {"startDate": "2026-08-22", "endDate": "2027-05-29", "currentMatchday": 6},
     "standings": [
         {
             "type": "TOTAL",
@@ -43,7 +46,7 @@ STANDINGS = {
                 }
             ],
         }
-    ]
+    ],
 }
 
 TEAMS = [
@@ -85,21 +88,33 @@ def test_format_score_returns_none_for_unplayed_match() -> None:
     assert format_score({"home": None, "away": None}) is None
 
 
+@pytest.mark.parametrize(
+    ("start_date", "expected"),
+    [("2026-08-22", "2026-27"), ("2026-09-08", "2026-27"), ("2099-08-01", "2099-00")],
+)
+def test_season_label_joins_start_year_and_next_year(start_date: str, expected: str) -> None:
+    assert season_label(start_date) == expected
+
+
 def test_summarize_standings_keeps_only_useful_fields() -> None:
-    assert summarize_standings(STANDINGS) == [
-        {
-            "position": 1,
-            "team": "Monaco",
-            "played": 5,
-            "won": 4,
-            "draw": 1,
-            "lost": 0,
-            "goals_for": 8,
-            "goals_against": 3,
-            "goal_difference": 5,
-            "points": 13,
-        }
-    ]
+    assert summarize_standings(STANDINGS) == {
+        "competition": "Ligue 1",
+        "season": "2026-27",
+        "table": [
+            {
+                "position": 1,
+                "team": "Monaco",
+                "played": 5,
+                "won": 4,
+                "drawn": 1,
+                "lost": 0,
+                "goals_for": 8,
+                "goals_against": 3,
+                "goal_difference": 5,
+                "points": 13,
+            }
+        ],
+    }
 
 
 def test_summarize_match_keeps_only_useful_fields() -> None:

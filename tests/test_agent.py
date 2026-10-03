@@ -17,6 +17,8 @@ from football_agent.tools import TOOL_SCHEMAS
 TODAY = date(2026, 10, 3)
 
 STANDINGS = {
+    "competition": {"code": "FL1", "name": "Ligue 1"},
+    "season": {"startDate": "2026-08-22"},
     "standings": [
         {
             "table": [
@@ -34,7 +36,7 @@ STANDINGS = {
                 }
             ]
         }
-    ]
+    ],
 }
 
 
@@ -101,7 +103,7 @@ def test_run_tool_call_returns_tool_result_as_json(cache: sqlite3.Connection) ->
 
     result = run_tool_call(football_api(cache), tool_call)
 
-    assert json.loads(result)[0]["team"] == "Monaco"
+    assert json.loads(result)["table"][0]["team"] == "Monaco"
 
 
 @pytest.mark.parametrize(
