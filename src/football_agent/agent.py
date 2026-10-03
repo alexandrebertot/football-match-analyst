@@ -42,7 +42,10 @@ def answer(question: str, llm: OpenAI, football: FootballDataClient, today: date
     ]
     for _ in range(MAX_TOOL_ROUNDS):
         response = llm.chat.completions.create(model=MODEL, messages=messages, tools=TOOL_SCHEMAS)
-        message = response.choices[0].message
+        choice = response.choices[0]
+        if choice.finish_reason == "length":
+            raise RuntimeError("The LLM reply was cut off because its context window is full.")
+        message = choice.message
         if not message.tool_calls:
             return message.content
         messages.append(message.model_dump(exclude_none=True))

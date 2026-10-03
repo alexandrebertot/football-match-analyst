@@ -39,7 +39,7 @@ STANDINGS = {
 
 
 class FakeLLM:
-    """Stand-in for the OpenAI client: returns scripted assistant messages, records each request."""
+    """Stand-in for the OpenAI client: returns scripted choices, records each request."""
 
     def __init__(self, replies: list[dict[str, Any]]) -> None:
         self.replies = iter(replies)
@@ -55,27 +55,24 @@ class FakeLLM:
                 "object": "chat.completion",
                 "created": 0,
                 "model": MODEL,
-                "choices": [
-                    {
-                        "index": 0,
-                        "finish_reason": "stop",
-                        "message": {"role": "assistant", **next(self.replies)},
-                    }
-                ],
+                "choices": [{"index": 0, **next(self.replies)}],
             }
         )
 
 
-def text_reply(content: str) -> dict[str, Any]:
-    return {"content": content}
+def text_reply(content: str, finish_reason: str = "stop") -> dict[str, Any]:
+    return {"finish_reason": finish_reason, "message": {"role": "assistant", "content": content}}
 
 
 def tool_reply(name: str, arguments: str) -> dict[str, Any]:
+    tool_call = {
+        "id": "call_1",
+        "type": "function",
+        "function": {"name": name, "arguments": arguments},
+    }
     return {
-        "content": None,
-        "tool_calls": [
-            {"id": "call_1", "type": "function", "function": {"name": name, "arguments": arguments}}
-        ],
+        "finish_reason": "tool_calls",
+        "message": {"role": "assistant", "content": None, "tool_calls": [tool_call]},
     }
 
 
@@ -91,7 +88,7 @@ def football_api(cache: sqlite3.Connection, status_code: int = 200) -> FootballD
 
 def make_tool_call(name: str, arguments: str) -> ChatCompletionMessageToolCall:
     return ChatCompletionMessageToolCall.model_validate(
-        tool_reply(name, arguments)["tool_calls"][0]
+        tool_reply(name, arguments)["message"]["tool_calls"][0]
     )
 
 
@@ -176,3 +173,10 @@ def test_answer_gives_up_after_max_tool_rounds(cache: sqlite3.Connection) -> Non
         answer("Classement ?", llm, football_api(cache), TODAY)
 
     assert len(llm.requests) == MAX_TOOL_ROUNDS
+
+
+def test_answer_refuses_a_reply_cut_off_by_the_context_window(cache: sqlite3.Connection) -> None:
+    llm = FakeLLM([text_reply("| 1 | PSG | 3 |\n| 2 | Bay", finish_reason="length")])
+
+    with pytest.raises(RuntimeError, match="cut off"):
+        answer("Classement complet de la C1 ?", llm, football_api(cache), TODAY)
