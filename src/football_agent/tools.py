@@ -81,6 +81,9 @@ def find_team(teams: list[dict[str, Any]], name: str) -> dict[str, Any]:
     raise ValueError(f"No team matches '{name}'. Available teams: {available}.")
 
 
+RESULT_POINTS = {"W": 3, "D": 1, "L": 0}
+
+
 def match_result(match: dict[str, Any], team_id: int) -> str:
     """Return 'W', 'D' or 'L' for the team `team_id` in a finished match."""
     winner = match["score"]["winner"]
@@ -95,9 +98,15 @@ def summarize_team_form(raw: dict[str, Any], team: dict[str, Any]) -> dict[str, 
         {**summarize_match(match), "result": match_result(match, team["id"])}
         for match in raw["matches"]
     ]
+    results = [match["result"] for match in matches]
     return {
         "team": team["shortName"],
-        "form": "".join(match["result"] for match in matches),
+        "played": len(results),
+        "won": results.count("W"),
+        "drawn": results.count("D"),
+        "lost": results.count("L"),
+        "points": sum(RESULT_POINTS[result] for result in results),
+        "form": "".join(results),
         "matches": matches,
     }
 
@@ -190,8 +199,9 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "get_team_form",
             "description": (
-                "Get the last results of a team in a competition: a form string such as 'WWDLW' "
-                "(W = win, D = draw, L = loss, oldest match first) and the detail of each match."
+                "Get the last results of a team in a competition: matches played, won, drawn and "
+                "lost, points earned, a form string such as 'WWDLW' (W = win, D = draw, L = loss, "
+                "oldest match first) and the detail of each match."
             ),
             "parameters": {
                 "type": "object",

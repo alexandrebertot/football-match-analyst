@@ -205,6 +205,22 @@ def test_summarize_team_form_builds_form_in_match_order() -> None:
     assert form["matches"][0]["score"] == "2-1"
 
 
+def test_summarize_team_form_counts_record_and_points() -> None:
+    # 3 wins, 2 draws and 1 loss: distinct counts, so swapping two counters cannot go unnoticed.
+    matches = []
+    for winner in ["HOME_TEAM", "DRAW", "HOME_TEAM", "AWAY_TEAM", "DRAW", "HOME_TEAM"]:
+        match = make_match("Paris FC", "Monaco", {"home": 0, "away": 0}, "FINISHED")
+        match["score"]["winner"] = winner
+        matches.append(match)
+    paris_fc = {"id": 1045, "name": "Paris FC", "shortName": "Paris FC"}
+
+    form = summarize_team_form({"matches": matches}, paris_fc)
+
+    assert form["form"] == "WDWLDW"
+    assert (form["played"], form["won"], form["drawn"], form["lost"]) == (6, 3, 2, 1)
+    assert form["points"] == 11
+
+
 def api_client(
     cache: sqlite3.Connection, responses: dict[str, Any], requests: list[httpx.Request]
 ) -> FootballDataClient:
