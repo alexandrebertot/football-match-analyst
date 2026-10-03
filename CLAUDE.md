@@ -9,7 +9,7 @@ later fine-tuned with QLoRA (distillation from a 7-8B teacher) to call tools rel
 - Python 3.13, `uv` for dependencies, `ruff` for lint and format, `pytest` for tests
 - LLM: Qwen via Ollama locally, called through the OpenAI-compatible API (`openai` client, custom `base_url`)
 - FastAPI, LightGBM, MLflow, Docker, GitHub Actions
-- Fine-tuning: `transformers`, `peft`, `trl` on a local RTX 5060 (8 GB VRAM, CUDA 12.8+)
+- Fine-tuning: `transformers`, `peft`, `trl` on a local RTX 4060 Laptop GPU (8 GB VRAM)
 
 ## Layout
 
