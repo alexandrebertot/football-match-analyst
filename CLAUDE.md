@@ -53,7 +53,7 @@ notebooks/         # exploration only, never imported by src/
 
 ## Git
 
-- Never commit on `main`. One branch per task: `feat/…`, `fix/…`, `refactor/…`, `test/…`, `docs/…`.
+- Never commit on `main`. One branch per task, prefixed with its Conventional Commits type: `feat/…`, `fix/…`, `refactor/…`, `test/…`, `docs/…`, `ci/…`, `build/…`, `chore/…`.
 - A branch only contains changes for its task. If you notice something unrelated, tell me instead of fixing it.
 - Small commits with Conventional Commits messages: `feat: add standings tool`, `fix: …`, `test: …`.
 - Never push, force-push, merge or rewrite history without my explicit request.
