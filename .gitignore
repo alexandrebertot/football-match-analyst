@@ -228,3 +228,4 @@ mlruns/
 mlartifacts/
 models/
 notes/
+mlflow.db
