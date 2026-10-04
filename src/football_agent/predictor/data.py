@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import httpx
+import pandas as pd
 
 BASE_URL = "https://football-data.co.uk/mmz4281"
 RAW_DATA_DIR = Path("data/raw")
@@ -8,6 +9,25 @@ RAW_DATA_DIR = Path("data/raw")
 LEAGUE_FILES = {"PL": "E0", "FL1": "F1", "BL1": "D1", "SA": "I1", "PD": "SP1"}
 # Start years of the 10 complete seasons, 2016-17 to 2025-26.
 SEASONS = range(2016, 2026)
+# football-data.co.uk columns we keep, renamed. Odds are closing odds (just before kick-off).
+COLUMNS = {
+    "Date": "date",
+    "HomeTeam": "home_team",
+    "AwayTeam": "away_team",
+    "FTHG": "home_goals",
+    "FTAG": "away_goals",
+    "FTR": "result",
+    "HS": "home_shots",
+    "AS": "away_shots",
+    "HST": "home_shots_on_target",
+    "AST": "away_shots_on_target",
+    "PSCH": "pinnacle_odds_home",
+    "PSCD": "pinnacle_odds_draw",
+    "PSCA": "pinnacle_odds_away",
+    "AvgCH": "average_odds_home",
+    "AvgCD": "average_odds_draw",
+    "AvgCA": "average_odds_away",
+}
 
 
 def season_code(season_start: int) -> str:
@@ -35,6 +55,29 @@ def download_season(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(response.content)
     return path
+
+
+def load_season(path: Path, competition: str, season_start: int) -> pd.DataFrame:
+    """Load one season's CSV with our column names; columns missing from old files become NaN."""
+    raw = pd.read_csv(path, encoding="utf-8-sig")
+    matches = raw.reindex(columns=list(COLUMNS)).rename(columns=COLUMNS)
+    # Older files write two-digit years (13/08/16), newer ones four-digit years (15/08/2025).
+    date_format = "%d/%m/%y" if len(matches["date"].iloc[0]) == 8 else "%d/%m/%Y"
+    matches["date"] = pd.to_datetime(matches["date"], format=date_format)
+    matches["competition"] = competition
+    matches["season"] = season_start
+    return matches
+
+
+def load_matches(data_dir: Path, seasons: range) -> pd.DataFrame:
+    """Load every competition over `seasons` into one table sorted by date."""
+    seasons_tables = [
+        load_season(raw_csv_path(data_dir, competition, season_start), competition, season_start)
+        for competition in LEAGUE_FILES
+        for season_start in seasons
+    ]
+    matches = pd.concat(seasons_tables, ignore_index=True)
+    return matches.sort_values("date", kind="stable", ignore_index=True)
 
 
 if __name__ == "__main__":
