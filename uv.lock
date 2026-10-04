@@ -509,6 +509,7 @@ dependencies = [
     { name = "mlflow" },
     { name = "openai" },
     { name = "pandas" },
+    { name = "pyyaml" },
     { name = "scikit-learn" },
     { name = "uvicorn" },
 ]
@@ -530,6 +531,7 @@ requires-dist = [
     { name = "mlflow", specifier = ">=3.16.1" },
     { name = "openai", specifier = ">=3.24.0" },
     { name = "pandas", specifier = ">=3.0.6" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "scikit-learn", specifier = ">=1.9.1" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]

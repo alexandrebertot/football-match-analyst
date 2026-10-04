@@ -55,7 +55,7 @@ def test_build_features_puts_each_team_form_on_its_side() -> None:
         ]
     )
 
-    features = build_features(matches)
+    features = build_features(matches, window=5)
 
     second = features.iloc[1]
     assert (second["home_form_points"], second["away_form_points"]) == (0.0, 3.0)
@@ -81,8 +81,8 @@ def test_features_of_a_match_never_depend_on_its_result_or_later_ones() -> None:
     changed = matches.copy()
     changed.loc[changed_match, ["home_goals", "away_goals"]] = [0, 5]
 
-    before = build_features(matches)[FEATURE_COLUMNS]
-    after = build_features(changed)[FEATURE_COLUMNS]
+    before = build_features(matches, window=5)[FEATURE_COLUMNS]
+    after = build_features(changed, window=5)[FEATURE_COLUMNS]
 
     earlier_or_same_day = matches["date"] <= matches.loc[changed_match, "date"]
     assert before[earlier_or_same_day].equals(after[earlier_or_same_day])

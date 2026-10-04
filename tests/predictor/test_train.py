@@ -5,7 +5,9 @@ import mlflow
 import numpy as np
 import pandas as pd
 import pytest
+import yaml
 
+from football_agent.predictor.config import TrainingConfig
 from football_agent.predictor.evaluation import OUTCOMES
 from football_agent.predictor.features import FEATURE_COLUMNS, build_features
 from football_agent.predictor.train import (
@@ -14,6 +16,8 @@ from football_agent.predictor.train import (
     run_experiment,
     train_model,
 )
+
+BASELINE = TrainingConfig(run_name="test-run", features=FEATURE_COLUMNS, form_window=5)
 
 
 def synthetic_league(seasons: range) -> pd.DataFrame:
@@ -50,16 +54,18 @@ def synthetic_league(seasons: range) -> pd.DataFrame:
 
 
 def test_train_model_orders_probability_columns_like_outcomes() -> None:
-    train = build_features(synthetic_league(range(2016, 2018)))
+    train = build_features(synthetic_league(range(2016, 2018)), window=5)
 
-    model = train_model(train)
+    model = train_model(train, FEATURE_COLUMNS, {})
 
     assert list(model.classes_) == OUTCOMES
     assert model.predict_proba(train[FEATURE_COLUMNS]).shape == (len(train), 3)
 
 
 def test_feature_importance_gives_split_and_gain_for_every_feature() -> None:
-    model = train_model(build_features(synthetic_league(range(2016, 2018))))
+    model = train_model(
+        build_features(synthetic_league(range(2016, 2018)), window=5), FEATURE_COLUMNS, {}
+    )
 
     importance = feature_importance(model)
 
@@ -77,7 +83,7 @@ def test_run_experiment_records_params_metrics_and_model(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("MLFLOW_TRACKING_URI", f"sqlite:///{tmp_path / 'mlflow.db'}")
 
-    scores = run_experiment(synthetic_league(range(2016, 2024)))
+    scores = run_experiment(synthetic_league(range(2016, 2024)), BASELINE)
 
     run = mlflow.search_runs(experiment_names=[EXPERIMENT_NAME], output_format="list")[0]
     assert run.data.metrics["validation_log_loss"] == pytest.approx(scores["log_loss"])
@@ -87,3 +93,6 @@ def test_run_experiment_records_params_metrics_and_model(
     assert list(model.classes_) == OUTCOMES
     importance = mlflow.artifacts.load_dict(f"{run.info.artifact_uri}/feature_importance.json")
     assert set(importance) == {"split", "gain"}
+    assert run.info.run_name == "test-run"
+    logged_config = mlflow.artifacts.load_text(f"{run.info.artifact_uri}/config.yaml")
+    assert yaml.safe_load(logged_config) == BASELINE.model_dump()

@@ -1,8 +1,13 @@
+import argparse
+from pathlib import Path
+from typing import Any
+
 import mlflow
 import mlflow.lightgbm
 import pandas as pd
 from lightgbm import LGBMClassifier
 
+from football_agent.predictor.config import TrainingConfig, load_config
 from football_agent.predictor.data import RAW_DATA_DIR, SEASONS, load_matches
 from football_agent.predictor.evaluation import (
     OUTCOMES,
@@ -13,14 +18,14 @@ from football_agent.predictor.evaluation import (
     naive_probabilities,
     temporal_split,
 )
-from football_agent.predictor.features import FEATURE_COLUMNS, FORM_WINDOW, build_features
+from football_agent.predictor.features import build_features
 
 EXPERIMENT_NAME = "match-outcome"
 
 
-def train_model(train: pd.DataFrame) -> LGBMClassifier:
-    model = LGBMClassifier(random_state=0, verbose=-1)
-    model.fit(train[FEATURE_COLUMNS], train["result"])
+def train_model(train: pd.DataFrame, features: list[str], params: dict[str, Any]) -> LGBMClassifier:
+    model = LGBMClassifier(random_state=0, verbose=-1, **params)
+    model.fit(train[features], train["result"])
     # predict_proba columns follow model.classes_; every metric assumes the OUTCOMES order.
     if list(model.classes_) != OUTCOMES:
         raise ValueError(f"Unexpected class order {list(model.classes_)}, expected {OUTCOMES}.")
@@ -33,7 +38,7 @@ def feature_importance(model: LGBMClassifier) -> dict[str, dict[str, float]]:
     return {
         importance_type: dict(
             zip(
-                FEATURE_COLUMNS,
+                model.feature_name_,
                 model.booster_.feature_importance(importance_type=importance_type).tolist(),
                 strict=True,
             )
@@ -42,19 +47,20 @@ def feature_importance(model: LGBMClassifier) -> dict[str, dict[str, float]]:
     }
 
 
-def run_experiment(matches: pd.DataFrame) -> dict[str, float]:
+def run_experiment(matches: pd.DataFrame, config: TrainingConfig) -> dict[str, float]:
     """Train on the train seasons, score on validation, and record everything in MLflow."""
-    train, validation, _ = temporal_split(build_features(matches))
+    train, validation, _ = temporal_split(build_features(matches, config.form_window))
     mlflow.set_experiment(EXPERIMENT_NAME)
-    with mlflow.start_run():
-        model = train_model(train)
-        scores = evaluate(model.predict_proba(validation[FEATURE_COLUMNS]), validation["result"])
+    with mlflow.start_run(run_name=config.run_name):
+        model = train_model(train, config.features, config.model)
+        probabilities = model.predict_proba(validation[config.features])
+        scores = evaluate(probabilities, validation["result"])
         naive = evaluate(naive_probabilities(train, len(validation)), validation["result"])
         market = evaluate(market_probabilities(validation), validation["result"])
         mlflow.log_params(
             {
-                "features": ",".join(FEATURE_COLUMNS),
-                "form_window": FORM_WINDOW,
+                "features": ",".join(config.features),
+                "form_window": config.form_window,
                 "train_seasons": f"{TRAIN_SEASONS.start}-{TRAIN_SEASONS.stop - 1}",
                 "validation_seasons": f"{VALIDATION_SEASONS.start}-{VALIDATION_SEASONS.stop - 1}",
                 **model.get_params(),
@@ -68,10 +74,14 @@ def run_experiment(matches: pd.DataFrame) -> dict[str, float]:
                 "market_validation_log_loss": market["log_loss"],
             }
         )
+        mlflow.log_dict(config.model_dump(), "config.yaml")
         mlflow.log_dict(feature_importance(model), "feature_importance.json")
         mlflow.lightgbm.log_model(model, name="model")
     return scores
 
 
 if __name__ == "__main__":
-    print(run_experiment(load_matches(RAW_DATA_DIR, SEASONS)))
+    parser = argparse.ArgumentParser(description="Train a match outcome model from a config.")
+    parser.add_argument("--config", type=Path, required=True, help="YAML training config")
+    args = parser.parse_args()
+    print(run_experiment(load_matches(RAW_DATA_DIR, SEASONS), load_config(args.config)))

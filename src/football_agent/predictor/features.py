@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 
-FORM_WINDOW = 5
 FEATURE_COLUMNS = ["home_form_points", "away_form_points"]
 
 
@@ -42,8 +41,8 @@ def add_rolling_form(rows: pd.DataFrame, window: int) -> pd.DataFrame:
     return rows.assign(form_points=form)
 
 
-def build_features(matches: pd.DataFrame) -> pd.DataFrame:
+def build_features(matches: pd.DataFrame, window: int) -> pd.DataFrame:
     """Add the recent form of both teams to each match, using only matches played before it."""
-    rows = add_rolling_form(team_match_rows(matches), FORM_WINDOW)
+    rows = add_rolling_form(team_match_rows(matches), window)
     form = rows.pivot(index="match_id", columns="side", values="form_points")
     return matches.assign(home_form_points=form["home"], away_form_points=form["away"])
