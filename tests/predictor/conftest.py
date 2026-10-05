@@ -27,6 +27,8 @@ def league() -> pd.DataFrame:
                     "away_team": away,
                     "home_goals": home_goals,
                     "away_goals": away_goals,
+                    "home_shots_on_target": home_goals + rng.integers(0, 5),
+                    "away_shots_on_target": away_goals + rng.integers(0, 5),
                     "average_odds_home": 2.5,
                     "average_odds_draw": 3.2,
                     "average_odds_away": 2.9,

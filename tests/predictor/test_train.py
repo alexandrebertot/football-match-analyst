@@ -99,8 +99,8 @@ def test_run_experiment_records_data_configs_metrics_and_model(
 def test_run_experiment_refuses_a_dataset_without_the_requested_features(
     dataset_dir: Path, training_config: TrainingConfig
 ) -> None:
-    train = pd.read_parquet(dataset_dir / "train.parquet").drop(columns="away_form_points")
+    train = pd.read_parquet(dataset_dir / "train.parquet").drop(columns="away_points_avg")
     train.to_parquet(dataset_dir / "train.parquet", index=False)
 
-    with pytest.raises(ValueError, match="away_form_points"):
+    with pytest.raises(ValueError, match="away_points_avg"):
         run_experiment(dataset_dir, training_config)

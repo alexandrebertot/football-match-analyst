@@ -1,5 +1,5 @@
-# Recent form of both teams (points per match over their last 5 matches).
-name: form5
+# Averages of both teams over their last 5 matches: points, goals scored and conceded, shots on target.
+name: last5
 seasons:            # start years, both ends included: 2016-17 to 2025-26
   first: 2016
   last: 2025

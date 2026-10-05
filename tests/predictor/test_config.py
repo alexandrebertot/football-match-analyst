@@ -12,7 +12,7 @@ from football_agent.predictor.config import (
 CONFIGS_DIR = Path(__file__).parents[2] / "configs"
 
 VALID_DATASET = """
-name: form5
+name: last5
 seasons:
   first: 2016
   last: 2025
@@ -33,10 +33,10 @@ features:
 VALID_TRAINING = """
 run:
   name: baseline-form
-dataset: form5
+dataset: last5
 features:
-  - home_form_points
-  - away_form_points
+  - home_points_avg
+  - away_points_avg
 model:
   n_estimators: 100
   learning_rate: 0.1
@@ -66,7 +66,7 @@ def test_season_range_includes_both_ends() -> None:
 def test_load_dataset_config_reads_a_valid_file(tmp_path: Path) -> None:
     config = load_dataset_config(write_config(tmp_path, VALID_DATASET))
 
-    assert config.name == "form5"
+    assert config.name == "last5"
     assert config.split.validation.to_range() == range(2023, 2024)
     assert config.features.form_window == 5
 
@@ -108,7 +108,7 @@ def test_load_training_config_reads_a_valid_file(tmp_path: Path) -> None:
         ("  num_leaves: 31\n", ""),
         ("  learning_rate: 0.1", "  learnig_rate: 0.1"),
         ("  learning_rate: 0.1", "  learning_rate: 0"),
-        ("  - away_form_points", "  - away_form_pts"),
+        ("  - away_points_avg", "  - away_points_av"),
         ("early_stopping_rounds: null", "early_stopping_rounds: 0"),
     ],
     ids=[
