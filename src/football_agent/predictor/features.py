@@ -1,26 +1,33 @@
 import numpy as np
 import pandas as pd
 
-FORM_WINDOW = 5
-FEATURE_COLUMNS = ["home_form_points", "away_form_points"]
+# Per-match statistics of a team, averaged over its previous matches to build the features.
+STATS = [
+    "points",
+    "goals_for",
+    "goals_against",
+    "shots_on_target_for",
+    "shots_on_target_against",
+]
+SIDES = ["home", "away"]
+FEATURE_COLUMNS = [f"{side}_{stat}_avg" for stat in STATS for side in SIDES]
 
 
 def team_match_rows(matches: pd.DataFrame) -> pd.DataFrame:
     """Return one row per team and match: each match appears twice, once from each side."""
     sides = []
-    for side, team, goals_for, goals_against in [
-        ("home", "home_team", "home_goals", "away_goals"),
-        ("away", "away_team", "away_goals", "home_goals"),
-    ]:
+    for side, opponent in [("home", "away"), ("away", "home")]:
         sides.append(
             pd.DataFrame(
                 {
                     "match_id": matches.index,
                     "date": matches["date"],
                     "side": side,
-                    "team": matches[team],
-                    "goals_for": matches[goals_for],
-                    "goals_against": matches[goals_against],
+                    "team": matches[f"{side}_team"],
+                    "goals_for": matches[f"{side}_goals"],
+                    "goals_against": matches[f"{opponent}_goals"],
+                    "shots_on_target_for": matches[f"{side}_shots_on_target"],
+                    "shots_on_target_against": matches[f"{opponent}_shots_on_target"],
                 }
             )
         )
@@ -33,17 +40,28 @@ def team_match_rows(matches: pd.DataFrame) -> pd.DataFrame:
     return rows.sort_values(["team", "date"], kind="stable", ignore_index=True)
 
 
-def add_rolling_form(rows: pd.DataFrame, window: int) -> pd.DataFrame:
-    """Add each team's average points over its previous `window` matches (current one excluded)."""
-    # shift(1) is what prevents leakage: a match only sees the results of the matches before it.
-    form = rows.groupby("team")["points"].transform(
-        lambda points: points.shift(1).rolling(window, min_periods=1).mean()
+def add_rolling_means(rows: pd.DataFrame, window: int) -> pd.DataFrame:
+    """Add each team's average of every stat over its previous `window` matches (current excluded).
+
+    Missing values (2 awarded matches have no shots) are skipped by the average.
+    """
+    # shift(1) is what prevents leakage: a match only sees the matches played before it.
+    means = rows.groupby("team")[STATS].transform(
+        lambda stats: stats.shift(1).rolling(window, min_periods=1).mean()
     )
-    return rows.assign(form_points=form)
+    return rows.assign(**{f"{stat}_avg": means[stat] for stat in STATS})
 
 
-def build_features(matches: pd.DataFrame) -> pd.DataFrame:
-    """Add the recent form of both teams to each match, using only matches played before it."""
-    rows = add_rolling_form(team_match_rows(matches), FORM_WINDOW)
-    form = rows.pivot(index="match_id", columns="side", values="form_points")
-    return matches.assign(home_form_points=form["home"], away_form_points=form["away"])
+def build_features(matches: pd.DataFrame, window: int) -> pd.DataFrame:
+    """Add both teams' recent averages to each match, using only matches played before it."""
+    rows = add_rolling_means(team_match_rows(matches), window)
+    averages = rows.pivot(
+        index="match_id", columns="side", values=[f"{stat}_avg" for stat in STATS]
+    )
+    return matches.assign(
+        **{
+            f"{side}_{stat}_avg": averages[(f"{stat}_avg", side)]
+            for stat in STATS
+            for side in SIDES
+        }
+    )

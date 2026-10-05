@@ -1,0 +1,20 @@
+# Same as the baseline, but many small steps stopped when the validation log-loss stops improving.
+run:
+  name: early-stopping
+dataset: last5
+features:
+  - home_points_avg
+  - away_points_avg
+model:
+  n_estimators: 2000
+  learning_rate: 0.02
+  num_leaves: 31
+  max_depth: -1
+  min_child_samples: 20
+  subsample: 1.0
+  subsample_freq: 0
+  colsample_bytree: 1.0
+  reg_alpha: 0.0
+  reg_lambda: 0.0
+training:
+  early_stopping_rounds: 100

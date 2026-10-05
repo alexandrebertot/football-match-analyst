@@ -2,19 +2,20 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, log_loss
 
-# Alphabetical order: scikit-learn metrics and LightGBM both sort class labels this way,
+from football_agent.predictor.config import Split
+
+# Alphabetical order: scikit-learn metrics read probability columns in sorted label order,
 # so every probability array in the project uses columns (away, draw, home).
 OUTCOMES = ["A", "D", "H"]
-TRAIN_SEASONS = range(2016, 2023)
-VALIDATION_SEASONS = range(2023, 2024)
-TEST_SEASONS = range(2024, 2026)
 
 
-def temporal_split(matches: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def temporal_split(
+    matches: pd.DataFrame, split: Split
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Split matches by whole seasons: train, then validation, then test."""
-    train = matches[matches["season"].isin(TRAIN_SEASONS)]
-    validation = matches[matches["season"].isin(VALIDATION_SEASONS)]
-    test = matches[matches["season"].isin(TEST_SEASONS)]
+    train = matches[matches["season"].isin(split.train.to_range())]
+    validation = matches[matches["season"].isin(split.validation.to_range())]
+    test = matches[matches["season"].isin(split.test.to_range())]
     return train, validation, test
 
 

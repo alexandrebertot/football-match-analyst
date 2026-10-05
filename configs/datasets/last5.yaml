@@ -1,0 +1,17 @@
+# Averages of both teams over their last 5 matches: points, goals scored and conceded, shots on target.
+name: last5
+seasons:            # start years, both ends included: 2016-17 to 2025-26
+  first: 2016
+  last: 2025
+split:
+  train:
+    first: 2016
+    last: 2022
+  validation:
+    first: 2023
+    last: 2023
+  test:
+    first: 2024
+    last: 2025
+features:
+  form_window: 5

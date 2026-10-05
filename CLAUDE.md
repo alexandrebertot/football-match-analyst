@@ -32,6 +32,11 @@ notebooks/         # exploration only, never imported by src/
 - Lint and format: `uv run ruff check --fix . && uv run ruff format .`
 - Tests: `uv run pytest`
 - API (needs Ollama running): `uv run --env-file .env uvicorn football_agent.app:app --reload`
+- Predictor data: `uv run python -m football_agent.predictor.data` (downloads the raw CSVs once)
+- Predictor dataset: `uv run python -m football_agent.predictor.prepare --config configs/datasets/<name>.yaml`
+  (rerun it after any change to the feature code: training reads the saved Parquet files)
+- Predictor training: `uv run python -m football_agent.predictor.train --config configs/training/<name>.yaml`
+- MLflow UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db`
 
 ## Code rules
 
