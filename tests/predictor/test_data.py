@@ -1,3 +1,5 @@
+from collections import Counter
+from datetime import date
 from pathlib import Path
 
 import httpx
@@ -8,7 +10,10 @@ from football_agent.predictor.data import (
     COLUMNS,
     LEAGUE_FILES,
     csv_url,
+    current_season,
+    download_history,
     download_season,
+    load_history,
     load_matches,
     load_season,
     raw_csv_path,
@@ -118,3 +123,53 @@ def test_load_matches_stacks_every_competition_sorted_by_date(tmp_path: Path) ->
     assert len(matches) == len(LEAGUE_FILES)
     assert matches["date"].is_monotonic_increasing
     assert list(matches["competition"]) == list(reversed(LEAGUE_FILES))
+
+
+@pytest.mark.parametrize(
+    ("today", "expected"),
+    [
+        (date(2026, 10, 5), 2026),
+        (date(2027, 3, 1), 2026),
+        (date(2026, 8, 1), 2026),
+        (date(2026, 7, 31), 2025),
+    ],
+)
+def test_current_season_starts_in_august(today: date, expected: int) -> None:
+    assert current_season(today) == expected
+
+
+def test_download_season_with_overwrite_replaces_the_file(tmp_path: Path) -> None:
+    requests: list[httpx.Request] = []
+    path = raw_csv_path(tmp_path, "FL1", 2026)
+    path.write_bytes(b"last week's file")
+
+    download_season(fake_http(requests), tmp_path, "FL1", 2026, overwrite=True)
+
+    assert len(requests) == 1
+    assert path.read_bytes() == b"Div,Date\nF1,15/08/2025\n"
+
+
+def test_download_history_refreshes_only_the_season_under_way(tmp_path: Path) -> None:
+    requests: list[httpx.Request] = []
+    http = fake_http(requests)
+    # On 2017-10-01, 2016-17 is finished and 2017-18 is under way.
+    today = date(2017, 10, 1)
+
+    download_history(http, tmp_path, today)
+    download_history(http, tmp_path, today)
+
+    downloads = Counter(request.url.path for request in requests)
+    assert downloads["/mmz4281/1617/F1.csv"] == 1
+    assert downloads["/mmz4281/1718/F1.csv"] == 2
+    assert len(requests) == 3 * len(LEAGUE_FILES)
+
+
+def test_load_history_includes_the_season_under_way(tmp_path: Path) -> None:
+    for competition in LEAGUE_FILES:
+        for season_start in [2016, 2017]:
+            csv = NEW_FORMAT_CSV.replace("15/08/2025", f"15/08/{season_start}")
+            raw_csv_path(tmp_path, competition, season_start).write_text(csv, encoding="utf-8")
+
+    history = load_history(tmp_path, date(2017, 10, 1))
+
+    assert sorted(history["season"].unique()) == [2016, 2017]
