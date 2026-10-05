@@ -1,7 +1,0 @@
-# Model v0: recent form of both teams, LightGBM default parameters.
-run_name: baseline-form
-features:
-  - home_form_points
-  - away_form_points
-form_window: 5
-model: {}

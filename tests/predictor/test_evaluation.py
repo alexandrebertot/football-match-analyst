@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from football_agent.predictor.config import Split
 from football_agent.predictor.evaluation import (
     evaluate,
     market_probabilities,
@@ -14,8 +15,15 @@ from football_agent.predictor.evaluation import (
 
 def test_temporal_split_keeps_seasons_in_order_without_overlap() -> None:
     matches = pd.DataFrame({"season": range(2016, 2026)})
+    split = Split.model_validate(
+        {
+            "train": {"first": 2016, "last": 2022},
+            "validation": {"first": 2023, "last": 2023},
+            "test": {"first": 2024, "last": 2025},
+        }
+    )
 
-    train, validation, test = temporal_split(matches)
+    train, validation, test = temporal_split(matches, split)
 
     assert list(train["season"]) == list(range(2016, 2023))
     assert list(validation["season"]) == [2023]

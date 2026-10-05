@@ -1,0 +1,20 @@
+# Model v0: recent form of both teams, LightGBM default hyperparameters written out.
+run:
+  name: baseline-form
+dataset: form5
+features:
+  - home_form_points
+  - away_form_points
+model:
+  n_estimators: 100
+  learning_rate: 0.1
+  num_leaves: 31
+  max_depth: -1
+  min_child_samples: 20
+  subsample: 1.0
+  subsample_freq: 0
+  colsample_bytree: 1.0
+  reg_alpha: 0.0
+  reg_lambda: 0.0
+training:
+  early_stopping_rounds: null   # no early stopping
