@@ -2,7 +2,13 @@ import numpy as np
 import pandas as pd
 
 # Per-match statistics of a team, averaged over its previous matches to build the features.
-STATS = ["points", "goals_for", "goals_against", "shots_on_target_for"]
+STATS = [
+    "points",
+    "goals_for",
+    "goals_against",
+    "shots_on_target_for",
+    "shots_on_target_against",
+]
 SIDES = ["home", "away"]
 FEATURE_COLUMNS = [f"{side}_{stat}_avg" for stat in STATS for side in SIDES]
 
@@ -10,20 +16,18 @@ FEATURE_COLUMNS = [f"{side}_{stat}_avg" for stat in STATS for side in SIDES]
 def team_match_rows(matches: pd.DataFrame) -> pd.DataFrame:
     """Return one row per team and match: each match appears twice, once from each side."""
     sides = []
-    for side, team, goals_for, goals_against, shots_on_target_for in [
-        ("home", "home_team", "home_goals", "away_goals", "home_shots_on_target"),
-        ("away", "away_team", "away_goals", "home_goals", "away_shots_on_target"),
-    ]:
+    for side, opponent in [("home", "away"), ("away", "home")]:
         sides.append(
             pd.DataFrame(
                 {
                     "match_id": matches.index,
                     "date": matches["date"],
                     "side": side,
-                    "team": matches[team],
-                    "goals_for": matches[goals_for],
-                    "goals_against": matches[goals_against],
-                    "shots_on_target_for": matches[shots_on_target_for],
+                    "team": matches[f"{side}_team"],
+                    "goals_for": matches[f"{side}_goals"],
+                    "goals_against": matches[f"{opponent}_goals"],
+                    "shots_on_target_for": matches[f"{side}_shots_on_target"],
+                    "shots_on_target_against": matches[f"{opponent}_shots_on_target"],
                 }
             )
         )

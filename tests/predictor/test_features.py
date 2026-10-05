@@ -42,9 +42,9 @@ def test_team_match_rows_gives_each_match_from_both_sides() -> None:
     psg = rows[rows["team"] == "PSG"].iloc[0]
     monaco = rows[rows["team"] == "Monaco"].iloc[0]
     assert (psg["side"], psg["goals_for"], psg["goals_against"], psg["points"]) == ("home", 1, 2, 0)
-    assert psg["shots_on_target_for"] == 4.0
+    assert (psg["shots_on_target_for"], psg["shots_on_target_against"]) == (4.0, 5.0)
     assert (monaco["side"], monaco["goals_for"], monaco["points"]) == ("away", 2, 3)
-    assert monaco["shots_on_target_for"] == 5.0
+    assert (monaco["shots_on_target_for"], monaco["shots_on_target_against"]) == (5.0, 4.0)
 
 
 def test_add_rolling_means_averages_previous_matches_only() -> None:
