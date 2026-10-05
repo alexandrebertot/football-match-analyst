@@ -1,0 +1,24 @@
+# Early stopping setup + average goals scored and shots on target of both teams, last 5 matches.
+run:
+  name: plus-goals-for-and-shots
+dataset: last5
+features:
+  - home_points_avg
+  - away_points_avg
+  - home_goals_for_avg
+  - away_goals_for_avg
+  - home_shots_on_target_for_avg
+  - away_shots_on_target_for_avg
+model:
+  n_estimators: 2000
+  learning_rate: 0.02
+  num_leaves: 31
+  max_depth: -1
+  min_child_samples: 20
+  subsample: 1.0
+  subsample_freq: 0
+  colsample_bytree: 1.0
+  reg_alpha: 0.0
+  reg_lambda: 0.0
+training:
+  early_stopping_rounds: 100
