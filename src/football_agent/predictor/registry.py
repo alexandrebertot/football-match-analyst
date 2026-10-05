@@ -2,10 +2,12 @@ import argparse
 
 import mlflow
 import mlflow.lightgbm
+import yaml
 from lightgbm import LGBMClassifier
 from mlflow import MlflowClient
 from mlflow.entities.model_registry import ModelVersion
 
+from football_agent.predictor.config import DatasetConfig
 from football_agent.predictor.train import EXPERIMENT_NAME
 
 MODEL_NAME = "match-outcome"
@@ -30,8 +32,15 @@ def promote_run(run_name: str) -> ModelVersion:
     return version
 
 
-def load_champion() -> LGBMClassifier:
-    return mlflow.lightgbm.load_model(f"models:/{MODEL_NAME}@{CHAMPION_ALIAS}")
+def load_champion() -> tuple[LGBMClassifier, DatasetConfig]:
+    """Return the champion model and the config of the dataset it was trained on.
+
+    Predictions must build features exactly like that dataset did (same form window).
+    """
+    version = MlflowClient().get_model_version_by_alias(MODEL_NAME, CHAMPION_ALIAS)
+    model = mlflow.lightgbm.load_model(f"models:/{MODEL_NAME}@{CHAMPION_ALIAS}")
+    dataset_yaml = mlflow.artifacts.load_text(f"runs:/{version.run_id}/dataset_config.yaml")
+    return model, DatasetConfig.model_validate(yaml.safe_load(dataset_yaml))
 
 
 if __name__ == "__main__":
