@@ -36,6 +36,9 @@ notebooks/         # exploration only, never imported by src/
 - Predictor dataset: `uv run python -m football_agent.predictor.prepare --config configs/datasets/<name>.yaml`
   (rerun it after any change to the feature code: training reads the saved Parquet files)
 - Predictor training: `uv run python -m football_agent.predictor.train --config configs/training/<name>.yaml`
+- Predictor champion: `uv run python -m football_agent.predictor.registry --run <run name>`
+  (registers the latest run with that name as a new version of `match-outcome` and moves the
+  `champion` alias to it; the agent always loads `models:/match-outcome@champion`)
 - MLflow UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db`
 
 ## Code rules
