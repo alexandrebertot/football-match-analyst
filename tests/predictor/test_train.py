@@ -53,19 +53,33 @@ def synthetic_league(seasons: range) -> pd.DataFrame:
     return matches
 
 
-def test_train_model_orders_probability_columns_like_outcomes() -> None:
-    train = build_features(synthetic_league(range(2016, 2018)), window=5)
+def train_and_validation() -> tuple[pd.DataFrame, pd.DataFrame]:
+    features = build_features(synthetic_league(range(2016, 2019)), window=5)
+    return features[features["season"] < 2018], features[features["season"] == 2018]
 
-    model = train_model(train, FEATURE_COLUMNS, {})
 
-    assert list(model.classes_) == OUTCOMES
-    assert model.predict_proba(train[FEATURE_COLUMNS]).shape == (len(train), 3)
+def test_train_model_gives_one_probability_column_per_outcome() -> None:
+    train, validation = train_and_validation()
+
+    model = train_model(train, validation, BASELINE)
+
+    assert list(model.classes_) == list(range(len(OUTCOMES)))
+    assert model.predict_proba(validation[FEATURE_COLUMNS]).shape == (len(validation), 3)
+
+
+def test_train_model_with_early_stopping_stops_before_the_iteration_limit() -> None:
+    train, validation = train_and_validation()
+    config = BASELINE.model_copy(
+        update={"model": {"n_estimators": 500}, "early_stopping_rounds": 5}
+    )
+
+    model = train_model(train, validation, config)
+
+    assert 0 < model.best_iteration_ < 500
 
 
 def test_feature_importance_gives_split_and_gain_for_every_feature() -> None:
-    model = train_model(
-        build_features(synthetic_league(range(2016, 2018)), window=5), FEATURE_COLUMNS, {}
-    )
+    model = train_model(*train_and_validation(), BASELINE)
 
     importance = feature_importance(model)
 
@@ -87,10 +101,12 @@ def test_run_experiment_records_params_metrics_and_model(
 
     run = mlflow.search_runs(experiment_names=[EXPERIMENT_NAME], output_format="list")[0]
     assert run.data.metrics["validation_log_loss"] == pytest.approx(scores["log_loss"])
-    assert {"naive_validation_log_loss", "market_validation_log_loss"} <= set(run.data.metrics)
+    assert {"naive_validation_log_loss", "market_validation_log_loss", "iterations"} <= set(
+        run.data.metrics
+    )
     assert run.data.params["features"] == ",".join(FEATURE_COLUMNS)
     model = mlflow.lightgbm.load_model(f"runs:/{run.info.run_id}/model")
-    assert list(model.classes_) == OUTCOMES
+    assert list(model.classes_) == list(range(len(OUTCOMES)))
     importance = mlflow.artifacts.load_dict(f"{run.info.artifact_uri}/feature_importance.json")
     assert set(importance) == {"split", "gain"}
     assert run.info.run_name == "test-run"

@@ -16,6 +16,7 @@ class TrainingConfig(BaseModel):
     features: list[str] = Field(min_length=1)
     form_window: int = Field(gt=0)
     model: dict[str, Any] = {}
+    early_stopping_rounds: int | None = Field(default=None, gt=0)
 
     @field_validator("features")
     @classmethod

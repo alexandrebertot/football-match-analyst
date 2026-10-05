@@ -1,0 +1,10 @@
+# Same features as the baseline; many small steps, stopped when the validation log-loss stops improving.
+run_name: early-stopping
+features:
+  - home_form_points
+  - away_form_points
+form_window: 5
+model:
+  n_estimators: 2000
+  learning_rate: 0.02
+early_stopping_rounds: 100

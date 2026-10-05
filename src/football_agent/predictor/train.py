@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 from typing import Any
 
+import lightgbm
 import mlflow
 import mlflow.lightgbm
 import pandas as pd
@@ -23,12 +24,24 @@ from football_agent.predictor.features import build_features
 EXPERIMENT_NAME = "match-outcome"
 
 
-def train_model(train: pd.DataFrame, features: list[str], params: dict[str, Any]) -> LGBMClassifier:
-    model = LGBMClassifier(random_state=0, verbose=-1, **params)
-    model.fit(train[features], train["result"])
-    # predict_proba columns follow model.classes_; every metric assumes the OUTCOMES order.
-    if list(model.classes_) != OUTCOMES:
-        raise ValueError(f"Unexpected class order {list(model.classes_)}, expected {OUTCOMES}.")
+def train_model(
+    train: pd.DataFrame, validation: pd.DataFrame, config: TrainingConfig
+) -> LGBMClassifier:
+    """Train on `train`; with early stopping, stop when the validation log-loss stops improving."""
+    # Labels are encoded as OUTCOMES indices, so probability column i is OUTCOMES[i]. LightGBM's
+    # eval_y does not accept text labels.
+    codes = {outcome: code for code, outcome in enumerate(OUTCOMES)}
+    model = LGBMClassifier(random_state=0, verbose=-1, **config.model)
+    fit_options: dict[str, Any] = {}
+    if config.early_stopping_rounds is not None:
+        fit_options = {
+            "eval_X": (validation[config.features],),
+            "eval_y": (validation["result"].map(codes),),
+            "callbacks": [lightgbm.early_stopping(config.early_stopping_rounds, verbose=False)],
+        }
+    model.fit(train[config.features], train["result"].map(codes), **fit_options)
+    if len(model.classes_) != len(OUTCOMES):
+        raise ValueError(f"Training data covers only classes {list(model.classes_)}.")
     return model
 
 
@@ -52,7 +65,7 @@ def run_experiment(matches: pd.DataFrame, config: TrainingConfig) -> dict[str, f
     train, validation, _ = temporal_split(build_features(matches, config.form_window))
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run(run_name=config.run_name):
-        model = train_model(train, config.features, config.model)
+        model = train_model(train, validation, config)
         probabilities = model.predict_proba(validation[config.features])
         scores = evaluate(probabilities, validation["result"])
         naive = evaluate(naive_probabilities(train, len(validation)), validation["result"])
@@ -61,6 +74,7 @@ def run_experiment(matches: pd.DataFrame, config: TrainingConfig) -> dict[str, f
             {
                 "features": ",".join(config.features),
                 "form_window": config.form_window,
+                "early_stopping_rounds": config.early_stopping_rounds,
                 "train_seasons": f"{TRAIN_SEASONS.start}-{TRAIN_SEASONS.stop - 1}",
                 "validation_seasons": f"{VALIDATION_SEASONS.start}-{VALIDATION_SEASONS.stop - 1}",
                 **model.get_params(),
@@ -72,6 +86,7 @@ def run_experiment(matches: pd.DataFrame, config: TrainingConfig) -> dict[str, f
                 "validation_accuracy": scores["accuracy"],
                 "naive_validation_log_loss": naive["log_loss"],
                 "market_validation_log_loss": market["log_loss"],
+                "iterations": model.best_iteration_ or model.n_estimators_,
             }
         )
         mlflow.log_dict(config.model_dump(), "config.yaml")
