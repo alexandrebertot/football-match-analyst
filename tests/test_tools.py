@@ -1,5 +1,6 @@
 import inspect
 import sqlite3
+from datetime import date
 from typing import Any
 
 import httpx
@@ -9,6 +10,7 @@ from football_agent.data_api import BASE_URL, FootballDataClient
 from football_agent.tools import (
     TOOL_FUNCTIONS,
     TOOL_SCHEMAS,
+    ToolContext,
     call_tool,
     find_team,
     format_score,
@@ -17,6 +19,7 @@ from football_agent.tools import (
     get_team_form,
     match_result,
     normalize_name,
+    predict_match,
     season_label,
     summarize_match,
     summarize_matches,
@@ -252,26 +255,29 @@ def test_summarize_team_form_counts_record_and_points() -> None:
     assert form["points"] == 11
 
 
-def api_client(
-    cache: sqlite3.Connection, responses: dict[str, Any], requests: list[httpx.Request]
-) -> FootballDataClient:
-    """Return a client backed by a fake API that answers each URL path with `responses[path]`."""
+def tool_context(
+    cache: sqlite3.Connection,
+    responses: dict[str, Any],
+    requests: list[httpx.Request],
+    predictor: Any = None,
+) -> ToolContext:
+    """Return a context whose fake API answers each URL path with `responses[path]`."""
 
     def handle(request: httpx.Request) -> httpx.Response:
         requests.append(request)
         return httpx.Response(200, json=responses[request.url.path])
 
     http = httpx.Client(base_url=BASE_URL, transport=httpx.MockTransport(handle))
-    return FootballDataClient(http, cache)
+    return ToolContext(football=FootballDataClient(http, cache), predictor=predictor)
 
 
 def test_get_standings_tool_returns_summarized_table_of_requested_season(
     cache: sqlite3.Connection,
 ) -> None:
     requests: list[httpx.Request] = []
-    client = api_client(cache, {"/v4/competitions/FL1/standings": STANDINGS}, requests)
+    context = tool_context(cache, {"/v4/competitions/FL1/standings": STANDINGS}, requests)
 
-    table = get_standings(client, "FL1", season=2025)
+    table = get_standings(context, "FL1", season=2025)
 
     assert table == summarize_standings(STANDINGS)
     assert requests[0].url.params["season"] == "2025"
@@ -280,9 +286,11 @@ def test_get_standings_tool_returns_summarized_table_of_requested_season(
 def test_get_matches_tool_converts_iso_dates(cache: sqlite3.Connection) -> None:
     requests: list[httpx.Request] = []
     finished = make_match("Paris FC", "Strasbourg", {"home": 2, "away": 1}, "FINISHED")
-    client = api_client(cache, {"/v4/competitions/FL1/matches": {"matches": [finished]}}, requests)
+    context = tool_context(
+        cache, {"/v4/competitions/FL1/matches": {"matches": [finished]}}, requests
+    )
 
-    matches = get_matches(client, "FL1", "2026-09-19", "2026-09-20")
+    matches = get_matches(context, "FL1", "2026-09-19", "2026-09-20")
 
     assert matches == [summarize_match(finished)]
     assert requests[0].url.params["dateFrom"] == "2026-09-19"
@@ -293,10 +301,10 @@ def test_get_matches_tool_rejects_malformed_date_before_calling_api(
     cache: sqlite3.Connection,
 ) -> None:
     requests: list[httpx.Request] = []
-    client = api_client(cache, {}, requests)
+    context = tool_context(cache, {}, requests)
 
     with pytest.raises(ValueError):
-        get_matches(client, "FL1", "19 septembre", "2026-09-20")
+        get_matches(context, "FL1", "19 septembre", "2026-09-20")
 
     assert requests == []
 
@@ -311,9 +319,9 @@ def test_get_team_form_tool_finds_team_and_filters_on_competition(
         "/v4/competitions/FL1/teams": {"teams": TEAMS},
         "/v4/teams/1045/matches": {"matches": [win]},
     }
-    client = api_client(cache, responses, requests)
+    context = tool_context(cache, responses, requests)
 
-    form = get_team_form(client, "paris fc", "FL1", last_n=3)
+    form = get_team_form(context, "paris fc", "FL1", last_n=3)
 
     assert form["team"] == "Paris FC"
     assert form["form"] == "W"
@@ -323,9 +331,9 @@ def test_get_team_form_tool_finds_team_and_filters_on_competition(
 
 def test_call_tool_runs_the_tool_with_llm_arguments(cache: sqlite3.Connection) -> None:
     requests: list[httpx.Request] = []
-    client = api_client(cache, {"/v4/competitions/FL1/standings": STANDINGS}, requests)
+    context = tool_context(cache, {"/v4/competitions/FL1/standings": STANDINGS}, requests)
 
-    result = call_tool(client, "get_standings", {"competition": "FL1"})
+    result = call_tool(context, "get_standings", {"competition": "FL1"})
 
     assert result == summarize_standings(STANDINGS)
 
@@ -333,17 +341,17 @@ def test_call_tool_runs_the_tool_with_llm_arguments(cache: sqlite3.Connection) -
 def test_call_tool_rejects_unknown_tool_and_lists_available_ones(
     cache: sqlite3.Connection,
 ) -> None:
-    client = api_client(cache, {}, [])
+    context = tool_context(cache, {}, [])
 
     with pytest.raises(ValueError, match="Unknown tool 'get_odds'. Available tools: get_standings"):
-        call_tool(client, "get_odds", {})
+        call_tool(context, "get_odds", {})
 
 
 @pytest.mark.parametrize("schema", TOOL_SCHEMAS, ids=lambda schema: schema["function"]["name"])
 def test_tool_schema_matches_its_python_function(schema: dict[str, Any]) -> None:
     function_schema = schema["function"]
     parameters = inspect.signature(TOOL_FUNCTIONS[function_schema["name"]]).parameters
-    llm_parameters = {name: p for name, p in parameters.items() if name != "client"}
+    llm_parameters = {name: p for name, p in parameters.items() if name != "context"}
     required = {name for name, p in llm_parameters.items() if p.default is inspect.Parameter.empty}
 
     assert set(function_schema["parameters"]["properties"]) == set(llm_parameters)
@@ -352,3 +360,38 @@ def test_tool_schema_matches_its_python_function(schema: dict[str, Any]) -> None
 
 def test_every_tool_function_has_a_schema() -> None:
     assert [schema["function"]["name"] for schema in TOOL_SCHEMAS] == list(TOOL_FUNCTIONS)
+
+
+def test_predict_match_finds_both_teams_and_asks_the_predictor(
+    cache: sqlite3.Connection, fake_predictor: Any
+) -> None:
+    responses = {"/v4/competitions/FL1/teams": {"teams": TEAMS}}
+    context = tool_context(cache, responses, [], fake_predictor)
+
+    prediction = predict_match(context, "psg", "Marseille", "FL1", "2026-10-18")
+
+    assert (prediction["home_team"], prediction["away_team"]) == ("PSG", "Marseille")
+    assert prediction["home_win"] == 0.5
+    home, away, kickoff = fake_predictor.requests[0]
+    assert (home["id"], away["id"], kickoff) == (524, 516, date(2026, 10, 18))
+
+
+def test_predict_match_defaults_to_today(cache: sqlite3.Connection, fake_predictor: Any) -> None:
+    context = tool_context(
+        cache, {"/v4/competitions/FL1/teams": {"teams": TEAMS}}, [], fake_predictor
+    )
+
+    predict_match(context, "PSG", "Marseille", "FL1")
+
+    assert fake_predictor.requests[0][2] == date.today()
+
+
+def test_predict_match_refuses_a_team_playing_itself(
+    cache: sqlite3.Connection, fake_predictor: Any
+) -> None:
+    context = tool_context(
+        cache, {"/v4/competitions/FL1/teams": {"teams": TEAMS}}, [], fake_predictor
+    )
+
+    with pytest.raises(ValueError, match="same team"):
+        predict_match(context, "PSG", "Paris Saint-Germain FC", "FL1")

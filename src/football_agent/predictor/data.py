@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import httpx
@@ -7,7 +8,7 @@ BASE_URL = "https://football-data.co.uk/mmz4281"
 RAW_DATA_DIR = Path("data/raw")
 # Our competition codes (the ones the agent uses) mapped to football-data.co.uk file names.
 LEAGUE_FILES = {"PL": "E0", "FL1": "F1", "BL1": "D1", "SA": "I1", "PD": "SP1"}
-# Start years of the 10 complete seasons, 2016-17 to 2025-26.
+# Start years of the 10 complete seasons used for training, 2016-17 to 2025-26.
 SEASONS = range(2016, 2026)
 # football-data.co.uk columns we keep, renamed. Odds are closing odds (just before kick-off).
 COLUMNS = {
@@ -43,12 +44,21 @@ def raw_csv_path(data_dir: Path, competition: str, season_start: int) -> Path:
     return data_dir / f"{competition}_{season_code(season_start)}.csv"
 
 
+def current_season(today: date) -> int:
+    """Start year of the season under way on `today`: seasons start in August."""
+    return today.year if today.month >= 8 else today.year - 1
+
+
 def download_season(
-    http: httpx.Client, data_dir: Path, competition: str, season_start: int
+    http: httpx.Client,
+    data_dir: Path,
+    competition: str,
+    season_start: int,
+    overwrite: bool = False,
 ) -> Path:
-    """Download one season's CSV into `data_dir`, unless it is already there."""
+    """Download one season's CSV into `data_dir`, unless it is already there and not overwritten."""
     path = raw_csv_path(data_dir, competition, season_start)
-    if path.exists():
+    if path.exists() and not overwrite:
         return path
     response = http.get(csv_url(competition, season_start))
     response.raise_for_status()
@@ -80,8 +90,25 @@ def load_matches(data_dir: Path, seasons: range) -> pd.DataFrame:
     return matches.sort_values("date", kind="stable", ignore_index=True)
 
 
+def history_seasons(today: date) -> range:
+    """Seasons from the first one we use up to the one under way on `today`."""
+    return range(SEASONS.start, current_season(today) + 1)
+
+
+def download_history(http: httpx.Client, data_dir: Path, today: date) -> None:
+    """Download each finished season once, and the season under way every time (it grows weekly)."""
+    season_under_way = current_season(today)
+    for competition in LEAGUE_FILES:
+        for season_start in history_seasons(today):
+            overwrite = season_start == season_under_way
+            download_season(http, data_dir, competition, season_start, overwrite)
+
+
+def load_history(data_dir: Path, today: date) -> pd.DataFrame:
+    """Every match played so far, up to the season under way on `today`."""
+    return load_matches(data_dir, history_seasons(today))
+
+
 if __name__ == "__main__":
     with httpx.Client(timeout=30.0) as http:
-        for competition in LEAGUE_FILES:
-            for season_start in SEASONS:
-                download_season(http, RAW_DATA_DIR, competition, season_start)
+        download_history(http, RAW_DATA_DIR, date.today())

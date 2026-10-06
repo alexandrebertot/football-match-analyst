@@ -1,0 +1,104 @@
+# football-data.org team id -> team name in the football-data.co.uk CSV files, for the teams
+# of the 2026-27 season. Checked against the 250 matches both sources had in common on
+# 2026-10-05 (same date, teams and score). Add promoted teams here each new season.
+PL:
+  1044: Bournemouth      # AFC Bournemouth
+  57:   Arsenal          # Arsenal FC
+  58:   Aston Villa      # Aston Villa FC
+  402:  Brentford        # Brentford FC
+  397:  Brighton         # Brighton & Hove Albion FC
+  61:   Chelsea          # Chelsea FC
+  1076: Coventry         # Coventry City FC
+  354:  Crystal Palace   # Crystal Palace FC
+  62:   Everton          # Everton FC
+  63:   Fulham           # Fulham FC
+  322:  Hull             # Hull City AFC
+  349:  Ipswich          # Ipswich Town FC
+  341:  Leeds            # Leeds United FC
+  64:   Liverpool        # Liverpool FC
+  65:   Man City         # Manchester City FC
+  66:   Man United       # Manchester United FC
+  67:   Newcastle        # Newcastle United FC
+  351:  "Nott'm Forest"  # Nottingham Forest FC
+  71:   Sunderland       # Sunderland AFC
+  73:   Tottenham        # Tottenham Hotspur FC
+FL1:
+  519:  Auxerre          # AJ Auxerre
+  548:  Monaco           # AS Monaco FC
+  532:  Angers           # Angers SCO
+  531:  Troyes           # ES Troyes AC
+  525:  Lorient          # FC Lorient
+  533:  Le Havre         # Le Havre AC
+  535:  Le Mans          # Le Mans FC
+  521:  Lille            # Lille OSC
+  522:  Nice             # OGC Nice
+  523:  Lyon             # Olympique Lyonnais
+  516:  Marseille        # Olympique de Marseille
+  1045: Paris FC         # Paris FC
+  524:  Paris SG         # Paris Saint-Germain FC
+  576:  Strasbourg       # RC Strasbourg Alsace
+  546:  Lens             # Racing Club de Lens
+  512:  Brest            # Stade Brestois 29
+  529:  Rennes           # Stade Rennais FC 1901
+  511:  Toulouse         # Toulouse FC
+BL1:
+  1:    FC Koln          # 1. FC Köln
+  28:   Union Berlin     # 1. FC Union Berlin
+  15:   Mainz            # 1. FSV Mainz 05
+  3:    Leverkusen       # Bayer 04 Leverkusen
+  4:    Dortmund         # Borussia Dortmund
+  18:   "M'gladbach"     # Borussia Mönchengladbach
+  19:   Ein Frankfurt    # Eintracht Frankfurt
+  16:   Augsburg         # FC Augsburg
+  5:    Bayern Munich    # FC Bayern München
+  6:    Schalke 04       # FC Schalke 04
+  7:    Hamburg          # Hamburger SV
+  721:  RB Leipzig       # RB Leipzig
+  17:   Freiburg         # SC Freiburg
+  29:   Paderborn        # SC Paderborn 07
+  719:  Elversberg       # SV 07 Elversberg
+  12:   Werder Bremen    # SV Werder Bremen
+  2:    Hoffenheim       # TSG 1899 Hoffenheim
+  10:   Stuttgart        # VfB Stuttgart
+SA:
+  98:   Milan            # AC Milan
+  5911: Monza            # AC Monza
+  99:   Fiorentina       # ACF Fiorentina
+  100:  Roma             # AS Roma
+  102:  Atalanta         # Atalanta BC
+  103:  Bologna          # Bologna FC 1909
+  104:  Cagliari         # Cagliari Calcio
+  7397: Como             # Como 1907
+  108:  Inter            # FC Internazionale Milano
+  470:  Frosinone        # Frosinone Calcio
+  107:  Genoa            # Genoa CFC
+  109:  Juventus         # Juventus FC
+  112:  Parma            # Parma Calcio 1913
+  110:  Lazio            # SS Lazio
+  113:  Napoli           # SSC Napoli
+  586:  Torino           # Torino FC
+  5890: Lecce            # US Lecce
+  471:  Sassuolo         # US Sassuolo Calcio
+  115:  Udinese          # Udinese Calcio
+  454:  Venezia          # Venezia FC
+PD:
+  77:   Ath Bilbao       # Athletic Club
+  79:   Osasuna          # CA Osasuna
+  78:   Ath Madrid       # Club Atlético de Madrid
+  263:  Alaves           # Deportivo Alavés
+  285:  Elche            # Elche CF
+  81:   Barcelona        # FC Barcelona
+  82:   Getafe           # Getafe CF
+  88:   Levante          # Levante UD
+  84:   Malaga           # Málaga CF
+  558:  Celta            # RC Celta de Vigo
+  560:  La Coruna        # RC Deportivo La Coruña
+  80:   Espanol          # RCD Espanyol de Barcelona
+  87:   Vallecano        # Rayo Vallecano de Madrid
+  90:   Betis            # Real Betis Balompié
+  86:   Real Madrid      # Real Madrid CF
+  5335: Santander        # Real Racing Club de Santander
+  92:   Sociedad         # Real Sociedad de Fútbol
+  559:  Sevilla          # Sevilla FC
+  95:   Valencia         # Valencia CF
+  94:   Villarreal       # Villarreal CF
