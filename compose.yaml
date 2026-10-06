@@ -1,0 +1,12 @@
+services:
+  api:
+    build: .
+    env_file: .env
+    # Ollama runs on Windows: with WSL's mirrored networking, only the host network reaches it on localhost.
+    network_mode: host
+    volumes:
+      - ./data:/app/data
+      - ./.cache:/app/.cache
+      - ./mlflow.db:/app/mlflow.db
+      # mlflow.db stores absolute paths to the model files, so they must be at the same path as on the host.
+      - ./mlruns:${PWD}/mlruns
