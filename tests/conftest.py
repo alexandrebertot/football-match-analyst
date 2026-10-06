@@ -1,6 +1,8 @@
 import sqlite3
 from collections.abc import Iterator
+from datetime import date
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -12,3 +14,19 @@ def cache(tmp_path: Path) -> Iterator[sqlite3.Connection]:
     db = open_cache(tmp_path / "cache" / "responses.sqlite")
     yield db
     db.close()
+
+
+class FakePredictor:
+    """Stand-in for MatchPredictor: returns a fixed prediction and records each request."""
+
+    def __init__(self) -> None:
+        self.requests: list[tuple[dict[str, Any], dict[str, Any], date]] = []
+
+    def predict(self, home: dict[str, Any], away: dict[str, Any], kickoff: date) -> dict[str, Any]:
+        self.requests.append((home, away, kickoff))
+        return {"home_win": 0.5, "draw": 0.3, "away_win": 0.2, "features": {}}
+
+
+@pytest.fixture
+def fake_predictor() -> FakePredictor:
+    return FakePredictor()

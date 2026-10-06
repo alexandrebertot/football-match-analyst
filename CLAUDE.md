@@ -31,7 +31,8 @@ notebooks/         # exploration only, never imported by src/
 - LLM (once, and after editing the Modelfile): `ollama create football-qwen -f ollama/Modelfile`
 - Lint and format: `uv run ruff check --fix . && uv run ruff format .`
 - Tests: `uv run pytest`
-- API (needs Ollama running): `uv run --env-file .env uvicorn football_agent.app:app --reload`
+- API (needs Ollama running and a `champion` model in `mlflow.db`; refreshes the current season
+  at start-up): `uv run --env-file .env uvicorn football_agent.app:app --reload`
 - Predictor data: `uv run python -m football_agent.predictor.data` (downloads the raw CSVs once)
 - Predictor dataset: `uv run python -m football_agent.predictor.prepare --config configs/datasets/<name>.yaml`
   (rerun it after any change to the feature code: training reads the saved Parquet files)

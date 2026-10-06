@@ -1,8 +1,10 @@
 import unicodedata
+from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
 from football_agent.data_api import FootballDataClient
+from football_agent.predictor.predict import MatchPredictor
 
 
 def format_score(score: dict[str, int | None]) -> str | None:
@@ -126,43 +128,73 @@ def summarize_team_form(raw: dict[str, Any], team: dict[str, Any]) -> dict[str, 
     }
 
 
+@dataclass
+class ToolContext:
+    """What the tools need besides the arguments chosen by the LLM."""
+
+    football: FootballDataClient
+    predictor: MatchPredictor
+
+
 def get_standings(
-    client: FootballDataClient, competition: str, season: int | None = None
+    context: ToolContext, competition: str, season: int | None = None
 ) -> dict[str, Any]:
-    return summarize_standings(client.get_standings(competition, season))
+    return summarize_standings(context.football.get_standings(competition, season))
 
 
 def get_matches(
-    client: FootballDataClient, competition: str, date_from: str, date_to: str
+    context: ToolContext, competition: str, date_from: str, date_to: str
 ) -> list[dict[str, Any]]:
-    raw = client.get_matches(
+    raw = context.football.get_matches(
         competition, date.fromisoformat(date_from), date.fromisoformat(date_to)
     )
     return summarize_matches(raw)
 
 
 def get_team_form(
-    client: FootballDataClient, team_name: str, competition: str, last_n: int = 5
+    context: ToolContext, team_name: str, competition: str, last_n: int = 5
 ) -> dict[str, Any]:
-    team = find_team(client.get_teams(competition)["teams"], team_name)
-    raw = client.get_team_matches(team["id"], competition, limit=last_n)
+    team = find_team(context.football.get_teams(competition)["teams"], team_name)
+    raw = context.football.get_team_matches(team["id"], competition, limit=last_n)
     return summarize_team_form(raw, team)
+
+
+def predict_match(
+    context: ToolContext,
+    home_team: str,
+    away_team: str,
+    competition: str,
+    match_date: str | None = None,
+) -> dict[str, Any]:
+    teams = context.football.get_teams(competition)["teams"]
+    home, away = find_team(teams, home_team), find_team(teams, away_team)
+    if home["id"] == away["id"]:
+        raise ValueError(f"'{home_team}' and '{away_team}' are the same team.")
+    kickoff = date.fromisoformat(match_date) if match_date else date.today()
+    prediction = context.predictor.predict(home, away, kickoff)
+    return {"home_team": home["shortName"], "away_team": away["shortName"], **prediction}
 
 
 TOOL_FUNCTIONS = {
     "get_standings": get_standings,
     "get_matches": get_matches,
     "get_team_form": get_team_form,
+    "predict_match": predict_match,
 }
 
+LEAGUES_DESCRIPTION = (
+    "PL = Premier League (England), FL1 = Ligue 1 (France), BL1 = Bundesliga (Germany), "
+    "SA = Serie A (Italy), PD = La Liga (Spain)"
+)
 COMPETITION_PARAMETER = {
     "type": "string",
     "enum": ["PL", "FL1", "BL1", "SA", "PD", "CL"],
-    "description": (
-        "Competition code: PL = Premier League (England), FL1 = Ligue 1 (France), "
-        "BL1 = Bundesliga (Germany), SA = Serie A (Italy), PD = La Liga (Spain), "
-        "CL = UEFA Champions League."
-    ),
+    "description": f"Competition code: {LEAGUES_DESCRIPTION}, CL = UEFA Champions League.",
+}
+LEAGUE_PARAMETER = {
+    "type": "string",
+    "enum": ["PL", "FL1", "BL1", "SA", "PD"],
+    "description": f"League code: {LEAGUES_DESCRIPTION}. The Champions League is not supported.",
 }
 
 TOOL_SCHEMAS = [
@@ -239,14 +271,43 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "predict_match",
+            "description": (
+                "Predict the outcome of a league match with a machine learning model: "
+                "probabilities of a home win, a draw and an away win, plus the statistics the "
+                "model used, averaged over each team's last 5 matches (points per match, shots on "
+                "target for and against). These are estimates, not certainties: present them as "
+                "such."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "home_team": {"type": "string", "description": "Home team name, e.g. 'PSG'."},
+                    "away_team": {
+                        "type": "string",
+                        "description": "Away team name, e.g. 'Marseille'.",
+                    },
+                    "competition": LEAGUE_PARAMETER,
+                    "match_date": {
+                        "type": "string",
+                        "description": "Match day, YYYY-MM-DD. Omit it for today.",
+                    },
+                },
+                "required": ["home_team", "away_team", "competition"],
+            },
+        },
+    },
 ]
 
 
 def call_tool(
-    client: FootballDataClient, name: str, arguments: dict[str, Any]
+    context: ToolContext, name: str, arguments: dict[str, Any]
 ) -> list[dict[str, Any]] | dict[str, Any]:
     """Run the tool called `name` with the arguments chosen by the LLM."""
     if name not in TOOL_FUNCTIONS:
         available = ", ".join(TOOL_FUNCTIONS)
         raise ValueError(f"Unknown tool '{name}'. Available tools: {available}.")
-    return TOOL_FUNCTIONS[name](client, **arguments)
+    return TOOL_FUNCTIONS[name](context, **arguments)

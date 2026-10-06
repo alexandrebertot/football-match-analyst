@@ -12,7 +12,7 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall
 from football_agent.agent import MAX_TOOL_ROUNDS, answer, build_system_prompt, run_tool_call
 from football_agent.data_api import BASE_URL, FootballDataClient
 from football_agent.llm import MODEL
-from football_agent.tools import TOOL_SCHEMAS
+from football_agent.tools import TOOL_SCHEMAS, ToolContext
 
 TODAY = date(2026, 10, 3)
 
@@ -78,14 +78,14 @@ def tool_reply(name: str, arguments: str) -> dict[str, Any]:
     }
 
 
-def football_api(cache: sqlite3.Connection, status_code: int = 200) -> FootballDataClient:
-    """Return a football client whose fake API always answers with the Ligue 1 standings."""
+def tool_context(cache: sqlite3.Connection, status_code: int = 200) -> ToolContext:
+    """Return a context whose fake football API always answers with the Ligue 1 standings."""
 
     def handle(request: httpx.Request) -> httpx.Response:
         return httpx.Response(status_code, json=STANDINGS)
 
     http = httpx.Client(base_url=BASE_URL, transport=httpx.MockTransport(handle))
-    return FootballDataClient(http, cache)
+    return ToolContext(football=FootballDataClient(http, cache), predictor=None)
 
 
 def make_tool_call(name: str, arguments: str) -> ChatCompletionMessageToolCall:
@@ -101,7 +101,7 @@ def test_build_system_prompt_gives_today_weekday_and_date() -> None:
 def test_run_tool_call_returns_tool_result_as_json(cache: sqlite3.Connection) -> None:
     tool_call = make_tool_call("get_standings", '{"competition": "FL1"}')
 
-    result = run_tool_call(football_api(cache), tool_call)
+    result = run_tool_call(tool_context(cache), tool_call)
 
     assert json.loads(result)["table"][0]["team"] == "Monaco"
 
@@ -120,7 +120,7 @@ def test_run_tool_call_turns_fixable_errors_into_messages(
 ) -> None:
     tool_call = make_tool_call("get_standings", arguments)
 
-    result = run_tool_call(football_api(cache, status_code), tool_call)
+    result = run_tool_call(tool_context(cache, status_code), tool_call)
 
     assert result.startswith("Error: ")
 
@@ -128,7 +128,7 @@ def test_run_tool_call_turns_fixable_errors_into_messages(
 def test_answer_returns_direct_reply_when_no_tool_is_needed(cache: sqlite3.Connection) -> None:
     llm = FakeLLM([text_reply("Bonjour !")])
 
-    reply = answer("Salut", llm, football_api(cache), TODAY)
+    reply = answer("Salut", llm, tool_context(cache), TODAY)
 
     assert reply == "Bonjour !"
     request = llm.requests[0]
@@ -145,7 +145,7 @@ def test_answer_runs_requested_tool_and_sends_result_back(cache: sqlite3.Connect
         ]
     )
 
-    reply = answer("Qui est premier en Ligue 1 ?", llm, football_api(cache), TODAY)
+    reply = answer("Qui est premier en Ligue 1 ?", llm, tool_context(cache), TODAY)
 
     assert reply == "Monaco est premier."
     messages = llm.requests[1]["messages"]
@@ -163,7 +163,7 @@ def test_answer_sends_tool_errors_back_to_the_llm(cache: sqlite3.Connection) -> 
         ]
     )
 
-    answer("Classement de la Ligue 1 ?", llm, football_api(cache), TODAY)
+    answer("Classement de la Ligue 1 ?", llm, tool_context(cache), TODAY)
 
     assert llm.requests[1]["messages"][3]["content"].startswith("Error: ")
 
@@ -172,7 +172,7 @@ def test_answer_gives_up_after_max_tool_rounds(cache: sqlite3.Connection) -> Non
     llm = FakeLLM([tool_reply("get_standings", '{"competition": "FL1"}')] * MAX_TOOL_ROUNDS)
 
     with pytest.raises(RuntimeError, match=f"No answer after {MAX_TOOL_ROUNDS} rounds"):
-        answer("Classement ?", llm, football_api(cache), TODAY)
+        answer("Classement ?", llm, tool_context(cache), TODAY)
 
     assert len(llm.requests) == MAX_TOOL_ROUNDS
 
@@ -181,4 +181,4 @@ def test_answer_refuses_a_reply_cut_off_by_the_context_window(cache: sqlite3.Con
     llm = FakeLLM([text_reply("| 1 | PSG | 3 |\n| 2 | Bay", finish_reason="length")])
 
     with pytest.raises(RuntimeError, match="cut off"):
-        answer("Classement complet de la C1 ?", llm, football_api(cache), TODAY)
+        answer("Classement complet de la C1 ?", llm, tool_context(cache), TODAY)
