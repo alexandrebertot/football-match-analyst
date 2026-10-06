@@ -5,8 +5,13 @@ import pandas as pd
 import pytest
 
 from football_agent.predictor.config import TrainingConfig
-from football_agent.predictor.features import FEATURE_COLUMNS, build_features
-from football_agent.predictor.predict import MatchPredictor, upcoming_match_features
+from football_agent.predictor.features import FEATURE_COLUMNS, STATS, build_features
+from football_agent.predictor.predict import (
+    STAT_LABELS,
+    MatchPredictor,
+    readable_form,
+    upcoming_match_features,
+)
 from football_agent.predictor.prepare import load_dataset
 from football_agent.predictor.train import train_model
 
@@ -57,24 +62,49 @@ def predictor(
     )
 
 
-def test_predict_gives_outcome_probabilities_and_the_features_behind_them(
+def test_predict_gives_outcome_probabilities_and_each_team_recent_form(
     predictor: MatchPredictor,
 ) -> None:
     prediction = predictor.predict(PSG, LYON, date(2019, 9, 1))
 
     total = prediction["home_win"] + prediction["draw"] + prediction["away_win"]
     assert total == pytest.approx(1.0, abs=0.002)
-    assert list(prediction["features"]) == list(predictor.model.feature_name_)
-    assert all(isinstance(value, float) for value in prediction["features"].values())
+    assert prediction["recent_form_matches"] == 5
+    assert list(prediction["recent_form"]) == ["PSG", "Olympique Lyon"]
+    psg_form = prediction["recent_form"]["PSG"]
+    assert set(psg_form) == set(STAT_LABELS.values())
+    assert all(isinstance(value, float) for value in psg_form.values())
 
 
-def test_predict_turns_missing_history_into_null_features(predictor: MatchPredictor) -> None:
+def test_predict_turns_missing_history_into_null_statistics(predictor: MatchPredictor) -> None:
     bastia = {"id": 999, "shortName": "Bastia"}
 
     prediction = predictor.predict(bastia, LYON, date(2019, 9, 1))
 
-    assert prediction["features"]["home_points_avg"] is None
-    assert prediction["features"]["away_points_avg"] is not None
+    assert prediction["recent_form"]["Bastia"]["points_per_match"] is None
+    assert prediction["recent_form"]["Olympique Lyon"]["points_per_match"] is not None
+
+
+def test_every_statistic_has_a_name_for_the_llm() -> None:
+    assert set(STAT_LABELS) == set(STATS)
+
+
+def test_readable_form_groups_features_by_team_under_explicit_names() -> None:
+    features = pd.Series(
+        {
+            "home_points_avg": 1.6,
+            "away_points_avg": 0.6,
+            "home_shots_on_target_against_avg": 3.4,
+            "away_shots_on_target_against_avg": float("nan"),
+        }
+    )
+
+    form = readable_form(features, "PSG", "Marseille")
+
+    assert form == {
+        "PSG": {"points_per_match": 1.6, "shots_on_target_conceded_per_match": 3.4},
+        "Marseille": {"points_per_match": 0.6, "shots_on_target_conceded_per_match": None},
+    }
 
 
 def test_predict_refuses_a_team_missing_from_the_team_names(predictor: MatchPredictor) -> None:

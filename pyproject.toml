@@ -35,8 +35,9 @@ dev = [
 ]
 
 [tool.uv]
-# Windows Smart App Control blocks the DLL of jiter 0.17 (used by openai); 0.16 loads fine.
-constraint-dependencies = ["jiter<0.17"]
+# Windows Smart App Control blocks the DLLs of jiter 0.17 (used by openai) and SQLAlchemy 2.1
+# (used by MLflow); the previous releases load fine.
+constraint-dependencies = ["jiter<0.17", "sqlalchemy<2.1"]
 
 [tool.ruff]
 line-length = 100

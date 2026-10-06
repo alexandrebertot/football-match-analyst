@@ -12,6 +12,15 @@ from football_agent.predictor.features import build_features
 from football_agent.predictor.registry import load_champion
 from football_agent.predictor.teams import load_team_names
 
+# How each per-match statistic of a team is named for the LLM: explicit, with its unit.
+STAT_LABELS = {
+    "points": "points_per_match",
+    "goals_for": "goals_scored_per_match",
+    "goals_against": "goals_conceded_per_match",
+    "shots_on_target_for": "shots_on_target_per_match",
+    "shots_on_target_against": "shots_on_target_conceded_per_match",
+}
+
 
 def upcoming_match_features(
     history: pd.DataFrame, home_team: str, away_team: str, kickoff: date, window: int
@@ -28,6 +37,19 @@ def upcoming_match_features(
     matches = pd.concat([played, upcoming], ignore_index=True)
     # iloc[[-1]] keeps a one-row DataFrame, and so the numeric type of every feature column.
     return build_features(matches, window).iloc[[-1]]
+
+
+def readable_form(
+    features: pd.Series, home_team: str, away_team: str
+) -> dict[str, dict[str, float | None]]:
+    """Group a match's features by team, under names that an LLM cannot misread."""
+    form: dict[str, dict[str, float | None]] = {home_team: {}, away_team: {}}
+    for name, value in features.items():
+        side, stat = name.removesuffix("_avg").split("_", 1)
+        team = home_team if side == "home" else away_team
+        # NaN is not valid JSON for the LLM: a team without history gets null instead.
+        form[team][STAT_LABELS[stat]] = None if pd.isna(value) else round(float(value), 2)
+    return form
 
 
 @dataclass
@@ -59,11 +81,10 @@ class MatchPredictor:
             "home_win": round(float(probabilities["H"]), 3),
             "draw": round(float(probabilities["D"]), 3),
             "away_win": round(float(probabilities["A"]), 3),
-            # NaN is not valid JSON for the LLM: a team without history gets null instead.
-            "features": {
-                name: None if pd.isna(value) else round(float(value), 2)
-                for name, value in model_features.iloc[0].items()
-            },
+            "recent_form_matches": self.form_window,
+            "recent_form": readable_form(
+                model_features.iloc[0], home["shortName"], away["shortName"]
+            ),
         }
 
 

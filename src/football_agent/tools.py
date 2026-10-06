@@ -277,10 +277,10 @@ TOOL_SCHEMAS = [
             "name": "predict_match",
             "description": (
                 "Predict the outcome of a league match with a machine learning model: "
-                "probabilities of a home win, a draw and an away win, plus the statistics the "
-                "model used, averaged over each team's last 5 matches (points per match, shots on "
-                "target for and against). These are estimates, not certainties: present them as "
-                "such."
+                "probabilities of a home win, a draw and an away win, plus, for each team, the "
+                "recent form the model used: averages over its last `recent_form_matches` "
+                "matches, home and away games combined. These are estimates, not certainties: "
+                "present them as such."
             ),
             "parameters": {
                 "type": "object",
