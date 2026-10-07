@@ -22,14 +22,15 @@ def client(
         yield test_client
 
 
-def test_ask_returns_the_agent_answer_with_the_loaded_predictor(
+def test_ask_returns_the_agent_answer_with_the_loaded_predictor_and_today(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, fake_predictor: Any
 ) -> None:
     received = {}
 
-    def fake_answer(question: str, llm: Any, context: Any, today: date) -> str:
+    def fake_answer(question: str, llm: Any, context: Any) -> str:
         received["question"] = question
         received["predictor"] = context.predictor
+        received["today"] = context.today
         return "Monaco est premier."
 
     monkeypatch.setattr(app_module, "answer", fake_answer)
@@ -40,6 +41,7 @@ def test_ask_returns_the_agent_answer_with_the_loaded_predictor(
     assert response.json() == {"answer": "Monaco est premier."}
     assert received["question"] == "Qui est premier en Ligue 1 ?"
     assert received["predictor"] is fake_predictor
+    assert received["today"] == date.today()
 
 
 @pytest.mark.parametrize(

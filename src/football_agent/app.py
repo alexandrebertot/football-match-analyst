@@ -51,8 +51,9 @@ def ask(body: AskRequest, request: Request) -> AskResponse:
         context = ToolContext(
             football=FootballDataClient(request.app.state.http, cache),
             predictor=request.app.state.predictor,
+            today=date.today(),
         )
-        reply = answer(body.question, request.app.state.llm, context, date.today())
+        reply = answer(body.question, request.app.state.llm, context)
     except RuntimeError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
     finally:

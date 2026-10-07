@@ -27,6 +27,8 @@ from football_agent.tools import (
     summarize_team_form,
 )
 
+TODAY = date(2026, 10, 3)
+
 STANDINGS = {
     "competition": {"code": "FL1", "name": "Ligue 1"},
     "season": {"startDate": "2026-08-22", "endDate": "2027-05-29", "currentMatchday": 6},
@@ -268,7 +270,7 @@ def tool_context(
         return httpx.Response(200, json=responses[request.url.path])
 
     http = httpx.Client(base_url=BASE_URL, transport=httpx.MockTransport(handle))
-    return ToolContext(football=FootballDataClient(http, cache), predictor=predictor)
+    return ToolContext(football=FootballDataClient(http, cache), predictor=predictor, today=TODAY)
 
 
 def test_get_standings_tool_returns_summarized_table_of_requested_season(
@@ -362,7 +364,7 @@ def test_every_tool_function_has_a_schema() -> None:
     assert [schema["function"]["name"] for schema in TOOL_SCHEMAS] == list(TOOL_FUNCTIONS)
 
 
-def test_predict_match_finds_both_teams_and_asks_the_predictor(
+def test_predict_match_finds_both_teams_and_returns_the_whole_prediction(
     cache: sqlite3.Connection, fake_predictor: Any
 ) -> None:
     responses = {"/v4/competitions/FL1/teams": {"teams": TEAMS}}
@@ -372,18 +374,22 @@ def test_predict_match_finds_both_teams_and_asks_the_predictor(
 
     assert (prediction["home_team"], prediction["away_team"]) == ("PSG", "Marseille")
     assert prediction["home_win"] == 0.5
+    assert prediction["recent_form_matches"] == 5
+    assert prediction["recent_form"]["Marseille"]["points_per_match"] == 1.4
     home, away, kickoff = fake_predictor.requests[0]
     assert (home["id"], away["id"], kickoff) == (524, 516, date(2026, 10, 18))
 
 
-def test_predict_match_defaults_to_today(cache: sqlite3.Connection, fake_predictor: Any) -> None:
+def test_predict_match_defaults_to_the_context_date(
+    cache: sqlite3.Connection, fake_predictor: Any
+) -> None:
     context = tool_context(
         cache, {"/v4/competitions/FL1/teams": {"teams": TEAMS}}, [], fake_predictor
     )
 
     predict_match(context, "PSG", "Marseille", "FL1")
 
-    assert fake_predictor.requests[0][2] == date.today()
+    assert fake_predictor.requests[0][2] == TODAY
 
 
 def test_predict_match_refuses_a_team_playing_itself(

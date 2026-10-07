@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from football_agent.predictor.config import DatasetConfig, load_dataset_config, read_yaml
+from football_agent.predictor.config import DatasetConfig, load_dataset_config
 from football_agent.predictor.data import RAW_DATA_DIR, load_matches
 from football_agent.predictor.evaluation import temporal_split
 from football_agent.predictor.features import build_features
@@ -26,7 +26,7 @@ def prepare_dataset(matches: pd.DataFrame, config: DatasetConfig, output_dir: Pa
 
 def load_dataset(dataset_dir: Path) -> tuple[DatasetConfig, dict[str, pd.DataFrame]]:
     """Return the config a dataset was prepared with and its train, validation and test parts."""
-    config = DatasetConfig.model_validate(read_yaml(dataset_dir / "dataset.yaml"))
+    config = load_dataset_config(dataset_dir / "dataset.yaml")
     parts = {part: pd.read_parquet(dataset_dir / f"{part}.parquet") for part in PARTS}
     return config, parts
 
