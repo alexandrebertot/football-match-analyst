@@ -46,6 +46,8 @@ def answer(question: str, llm: OpenAI, context: ToolContext) -> str:
             raise RuntimeError("The LLM reply was cut off because its context window is full.")
         message = choice.message
         if not message.tool_calls:
+            if not message.content or not message.content.strip():
+                raise RuntimeError("The LLM replied with neither text nor a tool call.")
             return message.content
         messages.append(message.model_dump(exclude_none=True))
         for tool_call in message.tool_calls:
