@@ -134,6 +134,7 @@ class ToolContext:
 
     football: FootballDataClient
     predictor: MatchPredictor
+    today: date
 
 
 def get_standings(
@@ -170,7 +171,7 @@ def predict_match(
     home, away = find_team(teams, home_team), find_team(teams, away_team)
     if home["id"] == away["id"]:
         raise ValueError(f"'{home_team}' and '{away_team}' are the same team.")
-    kickoff = date.fromisoformat(match_date) if match_date else date.today()
+    kickoff = date.fromisoformat(match_date) if match_date else context.today
     prediction = context.predictor.predict(home, away, kickoff)
     return {"home_team": home["shortName"], "away_team": away["shortName"], **prediction}
 

@@ -33,10 +33,10 @@ def run_tool_call(context: ToolContext, tool_call: ChatCompletionMessageToolCall
     return json.dumps(result, ensure_ascii=False)
 
 
-def answer(question: str, llm: OpenAI, context: ToolContext, today: date) -> str:
+def answer(question: str, llm: OpenAI, context: ToolContext) -> str:
     """Answer `question`, letting the LLM call the football tools until it replies with text."""
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": build_system_prompt(today)},
+        {"role": "system", "content": build_system_prompt(context.today)},
         {"role": "user", "content": question},
     ]
     for _ in range(MAX_TOOL_ROUNDS):
