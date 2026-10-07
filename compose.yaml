@@ -2,7 +2,7 @@ services:
   api:
     build: .
     env_file: .env
-    # Ollama runs on Windows: with WSL's mirrored networking, only the host network reaches it on localhost.
+    # Ollama runs on the host and listens on 127.0.0.1, which only the host network can reach.
     network_mode: host
     volumes:
       - ./data:/app/data

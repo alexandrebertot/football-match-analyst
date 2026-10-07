@@ -28,4 +28,4 @@ curl -X POST http://localhost:8000/ask \
   -d '{"question": "Who is top of the Premier League?"}'
 ```
 
-The container uses the host network to reach Ollama on `localhost:11434` (on WSL2, this needs `networkingMode=mirrored`).
+The container uses the host network to reach Ollama, which listens on the host's `localhost:11434`.
