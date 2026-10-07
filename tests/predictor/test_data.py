@@ -173,3 +173,39 @@ def test_load_history_includes_the_season_under_way(tmp_path: Path) -> None:
     history = load_history(tmp_path, date(2017, 10, 1))
 
     assert sorted(history["season"].unique()) == [2016, 2017]
+
+
+def http_without_season(missing_code: str) -> httpx.Client:
+    """Return an HTTP client whose fake server answers 404 for the files of one season."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if f"/{missing_code}/" in request.url.path:
+            return httpx.Response(404)
+        return httpx.Response(200, content=b"Div,Date\nF1,15/08/2016\n")
+
+    return httpx.Client(transport=httpx.MockTransport(handle))
+
+
+def test_download_history_skips_the_season_under_way_until_it_is_published(
+    tmp_path: Path,
+) -> None:
+    # On 2017-08-05, 2017-18 has started but football-data.co.uk has no file for it yet.
+    download_history(http_without_season("1718"), tmp_path, date(2017, 8, 5))
+
+    assert raw_csv_path(tmp_path, "FL1", 2016).exists()
+    assert not raw_csv_path(tmp_path, "FL1", 2017).exists()
+
+
+def test_download_history_still_fails_when_a_finished_season_is_missing(tmp_path: Path) -> None:
+    with pytest.raises(httpx.HTTPStatusError):
+        download_history(http_without_season("1617"), tmp_path, date(2017, 8, 5))
+
+
+def test_load_history_skips_the_season_under_way_until_it_is_published(tmp_path: Path) -> None:
+    for competition in LEAGUE_FILES:
+        csv = NEW_FORMAT_CSV.replace("15/08/2025", "15/08/2016")
+        raw_csv_path(tmp_path, competition, 2016).write_text(csv, encoding="utf-8")
+
+    history = load_history(tmp_path, date(2017, 8, 5))
+
+    assert list(history["season"].unique()) == [2016]

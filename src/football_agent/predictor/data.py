@@ -95,17 +95,33 @@ def history_seasons(today: date) -> range:
 
 
 def download_history(http: httpx.Client, data_dir: Path, today: date) -> None:
-    """Download each finished season once, and the season under way every time (it grows weekly)."""
+    """Download each finished season once, and the season under way every time (it grows weekly).
+
+    The season under way is skipped as long as football-data.co.uk has not published it.
+    """
     season_under_way = current_season(today)
     for competition in LEAGUE_FILES:
         for season_start in history_seasons(today):
             overwrite = season_start == season_under_way
-            download_season(http, data_dir, competition, season_start, overwrite)
+            try:
+                download_season(http, data_dir, competition, season_start, overwrite)
+            except httpx.HTTPStatusError as error:
+                # A season's file only appears with its first results, around mid-August.
+                if not (overwrite and error.response.status_code == 404):
+                    raise
 
 
 def load_history(data_dir: Path, today: date) -> pd.DataFrame:
-    """Every match played so far, up to the season under way on `today`."""
-    return load_matches(data_dir, history_seasons(today))
+    """Every match played so far: the finished seasons, plus the season under way once published."""
+    season_under_way = current_season(today)
+    finished = load_matches(data_dir, range(FIRST_SEASON, season_under_way))
+    under_way = []
+    for competition in LEAGUE_FILES:
+        path = raw_csv_path(data_dir, competition, season_under_way)
+        if path.exists():
+            under_way.append(load_season(path, competition, season_under_way))
+    matches = pd.concat([finished, *under_way], ignore_index=True)
+    return matches.sort_values("date", kind="stable", ignore_index=True)
 
 
 if __name__ == "__main__":
