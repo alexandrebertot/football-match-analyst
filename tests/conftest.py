@@ -24,7 +24,16 @@ class FakePredictor:
 
     def predict(self, home: dict[str, Any], away: dict[str, Any], kickoff: date) -> dict[str, Any]:
         self.requests.append((home, away, kickoff))
-        return {"home_win": 0.5, "draw": 0.3, "away_win": 0.2, "features": {}}
+        return {
+            "home_win": 0.5,
+            "draw": 0.3,
+            "away_win": 0.2,
+            "recent_form_matches": 5,
+            "recent_form": {
+                home["shortName"]: {"points_per_match": 2.2, "shots_on_target_per_match": 5.4},
+                away["shortName"]: {"points_per_match": 1.4, "shots_on_target_per_match": 3.8},
+            },
+        }
 
 
 @pytest.fixture

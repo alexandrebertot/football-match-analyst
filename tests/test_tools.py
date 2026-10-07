@@ -364,7 +364,7 @@ def test_every_tool_function_has_a_schema() -> None:
     assert [schema["function"]["name"] for schema in TOOL_SCHEMAS] == list(TOOL_FUNCTIONS)
 
 
-def test_predict_match_finds_both_teams_and_asks_the_predictor(
+def test_predict_match_finds_both_teams_and_returns_the_whole_prediction(
     cache: sqlite3.Connection, fake_predictor: Any
 ) -> None:
     responses = {"/v4/competitions/FL1/teams": {"teams": TEAMS}}
@@ -374,6 +374,8 @@ def test_predict_match_finds_both_teams_and_asks_the_predictor(
 
     assert (prediction["home_team"], prediction["away_team"]) == ("PSG", "Marseille")
     assert prediction["home_win"] == 0.5
+    assert prediction["recent_form_matches"] == 5
+    assert prediction["recent_form"]["Marseille"]["points_per_match"] == 1.4
     home, away, kickoff = fake_predictor.requests[0]
     assert (home["id"], away["id"], kickoff) == (524, 516, date(2026, 10, 18))
 
