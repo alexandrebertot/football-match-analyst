@@ -62,7 +62,7 @@ class FakeLLM:
         )
 
 
-def text_reply(content: str, finish_reason: str = "stop") -> dict[str, Any]:
+def text_reply(content: str | None, finish_reason: str = "stop") -> dict[str, Any]:
     return {"finish_reason": finish_reason, "message": {"role": "assistant", "content": content}}
 
 
@@ -182,3 +182,11 @@ def test_answer_refuses_a_reply_cut_off_by_the_context_window(cache: sqlite3.Con
 
     with pytest.raises(RuntimeError, match="cut off"):
         answer("Classement complet de la C1 ?", llm, tool_context(cache))
+
+
+@pytest.mark.parametrize("content", [None, "", " \n"], ids=["none", "empty", "blank"])
+def test_answer_refuses_an_empty_reply(cache: sqlite3.Connection, content: str | None) -> None:
+    llm = FakeLLM([text_reply(content)])
+
+    with pytest.raises(RuntimeError, match="neither text nor a tool call"):
+        answer("Classement ?", llm, tool_context(cache))
