@@ -4,6 +4,7 @@ from datetime import date
 from typing import Any
 
 from football_agent.data_api import FootballDataClient
+from football_agent.predictor.data import LEAGUE_FILES
 from football_agent.predictor.predict import MatchPredictor
 
 
@@ -98,6 +99,7 @@ def find_team(teams: list[dict[str, Any]], name: str) -> dict[str, Any]:
     raise ValueError(f"No team matches '{name}'. Available teams: {available}.")
 
 
+DEFAULT_FORM_MATCHES = 5
 RESULT_POINTS = {"W": 3, "D": 1, "L": 0}
 
 
@@ -153,7 +155,7 @@ def get_matches(
 
 
 def get_team_form(
-    context: ToolContext, team_name: str, competition: str, last_n: int = 5
+    context: ToolContext, team_name: str, competition: str, last_n: int = DEFAULT_FORM_MATCHES
 ) -> dict[str, Any]:
     team = find_team(context.football.get_teams(competition)["teams"], team_name)
     raw = context.football.get_team_matches(team["id"], competition, limit=last_n)
@@ -189,12 +191,12 @@ LEAGUES_DESCRIPTION = (
 )
 COMPETITION_PARAMETER = {
     "type": "string",
-    "enum": ["PL", "FL1", "BL1", "SA", "PD", "CL"],
+    "enum": [*LEAGUE_FILES, "CL"],
     "description": f"Competition code: {LEAGUES_DESCRIPTION}, CL = UEFA Champions League.",
 }
 LEAGUE_PARAMETER = {
     "type": "string",
-    "enum": ["PL", "FL1", "BL1", "SA", "PD"],
+    "enum": list(LEAGUE_FILES),
     "description": f"League code: {LEAGUES_DESCRIPTION}. The Champions League is not supported.",
 }
 
@@ -265,7 +267,10 @@ TOOL_SCHEMAS = [
                     "competition": COMPETITION_PARAMETER,
                     "last_n": {
                         "type": "integer",
-                        "description": "Number of last finished matches to return. Defaults to 5.",
+                        "description": (
+                            "Number of last finished matches to return. "
+                            f"Defaults to {DEFAULT_FORM_MATCHES}."
+                        ),
                     },
                 },
                 "required": ["team_name", "competition"],
