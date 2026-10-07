@@ -6,10 +6,9 @@ import pandas as pd
 
 BASE_URL = "https://football-data.co.uk/mmz4281"
 RAW_DATA_DIR = Path("data/raw")
-# Our competition codes (the ones the agent uses) mapped to football-data.co.uk file names.
 LEAGUE_FILES = {"PL": "E0", "FL1": "F1", "BL1": "D1", "SA": "I1", "PD": "SP1"}
-# Start years of the 10 complete seasons used for training, 2016-17 to 2025-26.
-SEASONS = range(2016, 2026)
+# Start year of the first season downloaded; dataset configs choose their seasons from there on.
+FIRST_SEASON = 2016
 # football-data.co.uk columns we keep, renamed. Odds are closing odds (just before kick-off).
 COLUMNS = {
     "Date": "date",
@@ -92,7 +91,7 @@ def load_matches(data_dir: Path, seasons: range) -> pd.DataFrame:
 
 def history_seasons(today: date) -> range:
     """Seasons from the first one we use up to the one under way on `today`."""
-    return range(SEASONS.start, current_season(today) + 1)
+    return range(FIRST_SEASON, current_season(today) + 1)
 
 
 def download_history(http: httpx.Client, data_dir: Path, today: date) -> None:
