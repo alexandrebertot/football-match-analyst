@@ -6,7 +6,9 @@ import pytest
 
 from football_agent.predictor.config import Split
 from football_agent.predictor.evaluation import (
+    compare_with_baselines,
     evaluate,
+    gap_closed,
     market_probabilities,
     naive_probabilities,
     temporal_split,
@@ -69,3 +71,33 @@ def test_evaluate_gives_ln3_for_uniform_predictions() -> None:
     scores = evaluate(np.full((4, 3), 1 / 3), results)
 
     assert scores["log_loss"] == pytest.approx(math.log(3))
+
+
+def test_compare_with_baselines_scores_the_model_and_both_baselines_on_the_same_matches() -> None:
+    # Train frequencies: away 0.25, draw 0.25, home 0.5. Equal odds give the market 1/3 each.
+    train = pd.DataFrame({"result": ["H", "H", "D", "A"]})
+    matches = pd.DataFrame(
+        {
+            "result": ["H", "A"],
+            "average_odds_home": [3.0, 3.0],
+            "average_odds_draw": [3.0, 3.0],
+            "average_odds_away": [3.0, 3.0],
+        }
+    )
+    probabilities = np.array([[0.1, 0.2, 0.7], [0.2, 0.3, 0.5]])
+
+    scores = compare_with_baselines(probabilities, train, matches)
+
+    assert scores["log_loss"] == pytest.approx(-(math.log(0.7) + math.log(0.2)) / 2)
+    assert scores["accuracy"] == 0.5
+    assert scores["naive_log_loss"] == pytest.approx(-(math.log(0.5) + math.log(0.25)) / 2)
+    assert scores["market_log_loss"] == pytest.approx(math.log(3))
+
+
+@pytest.mark.parametrize(("log_loss", "expected"), [(1.0185, 0.4746), (1.0774, 0.0), (0.9533, 1.0)])
+def test_gap_closed_measures_the_way_from_the_naive_baseline_to_the_market(
+    log_loss: float, expected: float
+) -> None:
+    scores = {"log_loss": log_loss, "naive_log_loss": 1.0774, "market_log_loss": 0.9533}
+
+    assert gap_closed(scores) == pytest.approx(expected, abs=0.0001)

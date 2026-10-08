@@ -10,12 +10,7 @@ import pandas as pd
 from lightgbm import LGBMClassifier
 
 from football_agent.predictor.config import TrainingConfig, load_training_config
-from football_agent.predictor.evaluation import (
-    OUTCOMES,
-    evaluate,
-    market_probabilities,
-    naive_probabilities,
-)
+from football_agent.predictor.evaluation import OUTCOMES, compare_with_baselines
 from football_agent.predictor.prepare import PROCESSED_DATA_DIR, load_dataset
 
 EXPERIMENT_NAME = "match-outcome"
@@ -76,9 +71,8 @@ def run_experiment(dataset_dir: Path, config: TrainingConfig) -> dict[str, float
             name = f"{dataset_config.name}-{context}"
             mlflow.log_input(mlflow.data.from_pandas(rows, name=name), context=context)
         model = train_model(train, validation, config)
-        scores = evaluate(model.predict_proba(validation[config.features]), validation["result"])
-        naive = evaluate(naive_probabilities(train, len(validation)), validation["result"])
-        market = evaluate(market_probabilities(validation), validation["result"])
+        probabilities = model.predict_proba(validation[config.features])
+        scores = compare_with_baselines(probabilities, train, validation)
         split = dataset_config.split
         mlflow.log_params(
             {
@@ -95,8 +89,8 @@ def run_experiment(dataset_dir: Path, config: TrainingConfig) -> dict[str, float
             {
                 "validation_log_loss": scores["log_loss"],
                 "validation_accuracy": scores["accuracy"],
-                "naive_validation_log_loss": naive["log_loss"],
-                "market_validation_log_loss": market["log_loss"],
+                "naive_validation_log_loss": scores["naive_log_loss"],
+                "market_validation_log_loss": scores["market_log_loss"],
                 "iterations": model.best_iteration_ or model.n_estimators_,
             }
         )
