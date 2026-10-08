@@ -47,17 +47,18 @@ target conceded. Each match only sees the matches played before it, and predicti
 same feature code as training.
 
 **Split.** By whole seasons, in time order: train on 2016-17 to 2022-23, validate on 2023-24 to
-compare configs. The test seasons, 2024-25 and 2025-26, are held out for a final, unbiased score.
+compare configs, test on 2024-25 and 2025-26.
 
-**Results** on the validation season:
+**Results** (log-loss, lower is better):
 
-| Model | Log-loss |
-| --- | --- |
-| Naive: outcome frequencies of the train seasons | 1.0774 |
-| **LightGBM champion, 6 features** | **1.0185** |
-| Bookmakers' closing odds | 0.9533 |
+| Model | Validation, 2023-24 | **Test, 2024-25 and 2025-26** |
+| --- | --- | --- |
+| Naive: outcome frequencies of the train seasons | 1.0774 | 1.0750 |
+| **LightGBM champion, 6 features** | 1.0185 | **1.0285** |
+| Bookmakers' closing odds | 0.9533 | 0.9691 |
 
-The model closes 47% of the gap between the naive baseline and the closing odds. Beating the
+On the test seasons, scored once after choosing the model, it closes 44% of the gap between the
+naive baseline and the closing odds (47% on validation, which was used to choose it). Beating the
 odds is not expected: they include team news, injuries and line-ups that match statistics do not.
 
 **Tracking.** Datasets and training runs are described by YAML configs in [`configs/`](configs).
@@ -94,11 +95,12 @@ echo "FOOTBALL_DATA_API_KEY=<your key>" > .env
 # The LLM: Qwen 3.5 9B with an 8,192-token context, which keeps it fully on an 8 GB GPU
 ollama create football-qwen -f ollama/Modelfile
 
-# The predictor: download the history, build the dataset, train, promote the run to champion
+# The predictor: download the history, build the dataset, train, promote to champion, test
 uv run python -m football_agent.predictor.data
 uv run python -m football_agent.predictor.prepare --config configs/datasets/last5.yaml
 uv run python -m football_agent.predictor.train --config configs/training/plus_shots_on_target_against.yaml
 uv run python -m football_agent.predictor.registry --run plus-shots-on-target-against
+uv run python -m football_agent.predictor.final_score   # test score, computed once per champion
 
 # The API
 uv run --env-file .env uvicorn football_agent.app:app
