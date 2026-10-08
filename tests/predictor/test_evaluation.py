@@ -8,6 +8,7 @@ from football_agent.predictor.config import Split
 from football_agent.predictor.evaluation import (
     compare_with_baselines,
     evaluate,
+    gap_closed,
     market_probabilities,
     naive_probabilities,
     temporal_split,
@@ -91,3 +92,12 @@ def test_compare_with_baselines_scores_the_model_and_both_baselines_on_the_same_
     assert scores["accuracy"] == 0.5
     assert scores["naive_log_loss"] == pytest.approx(-(math.log(0.5) + math.log(0.25)) / 2)
     assert scores["market_log_loss"] == pytest.approx(math.log(3))
+
+
+@pytest.mark.parametrize(("log_loss", "expected"), [(1.0185, 0.4746), (1.0774, 0.0), (0.9533, 1.0)])
+def test_gap_closed_measures_the_way_from_the_naive_baseline_to_the_market(
+    log_loss: float, expected: float
+) -> None:
+    scores = {"log_loss": log_loss, "naive_log_loss": 1.0774, "market_log_loss": 0.9533}
+
+    assert gap_closed(scores) == pytest.approx(expected, abs=0.0001)

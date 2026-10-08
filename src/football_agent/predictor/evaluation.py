@@ -53,3 +53,9 @@ def compare_with_baselines(
         "naive_log_loss": evaluate(naive_probabilities(train, len(matches)), results)["log_loss"],
         "market_log_loss": evaluate(market_probabilities(matches), results)["log_loss"],
     }
+
+
+def gap_closed(scores: dict[str, float]) -> float:
+    """Share of the log-loss gap between the naive baseline and the market closed by the model."""
+    naive = scores["naive_log_loss"]
+    return (naive - scores["log_loss"]) / (naive - scores["market_log_loss"])

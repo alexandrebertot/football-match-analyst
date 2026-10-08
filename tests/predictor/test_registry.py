@@ -13,13 +13,6 @@ from football_agent.predictor.registry import (
 from football_agent.predictor.train import run_experiment
 
 
-@pytest.fixture
-def tracking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # MLflow writes its database and artifacts relative to the working directory.
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("MLFLOW_TRACKING_URI", f"sqlite:///{tmp_path / 'mlflow.db'}")
-
-
 def test_promote_run_registers_a_new_version_and_moves_the_champion_alias(
     tracking: None, dataset_dir: Path, training_config: TrainingConfig
 ) -> None:
