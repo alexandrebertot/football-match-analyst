@@ -90,7 +90,7 @@ def load_matches(data_dir: Path, seasons: range) -> pd.DataFrame:
 
 
 def history_seasons(today: date) -> range:
-    """Seasons from the first one we use up to the one under way on `today`."""
+    """Seasons from the first one downloaded up to the one under way on `today`."""
     return range(FIRST_SEASON, current_season(today) + 1)
 
 
