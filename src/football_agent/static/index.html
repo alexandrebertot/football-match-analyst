@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Football agent</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/marked@18.0.14/lib/marked.umd.js"
+    integrity="sha384-2vpGtuKqJvFlwJqYnf/wUMuzUfhUnYBt9oay0e2yaFcq0Dh6/aEbQ8YAOeKGzlYo"
+    crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.4.16/dist/purify.min.js"
+    integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL"
+    crossorigin="anonymous"></script>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, sans-serif;
+    }
+    body {
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 48rem;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+    header p {
+      margin-top: 0;
+      opacity: 0.7;
+    }
+    #messages {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      overflow-y: auto;
+    }
+    .message {
+      max-width: 85%;
+      padding: 0.6rem 0.9rem;
+      border-radius: 0.8rem;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .user {
+      align-self: flex-end;
+      background: #2563eb;
+      color: white;
+    }
+    .agent,
+    .thinking,
+    .error {
+      align-self: flex-start;
+      background: rgb(127 127 127 / 15%);
+    }
+    .thinking {
+      font-style: italic;
+      opacity: 0.7;
+    }
+    .error {
+      background: rgb(220 38 38 / 20%);
+    }
+    .markdown {
+      white-space: normal;
+    }
+    .markdown > :first-child {
+      margin-top: 0;
+    }
+    .markdown > :last-child {
+      margin-bottom: 0;
+    }
+    .markdown table {
+      display: block;
+      overflow-x: auto;
+      border-collapse: collapse;
+    }
+    .markdown th,
+    .markdown td {
+      padding: 0.25rem 0.6rem;
+      border: 1px solid rgb(127 127 127 / 40%);
+      white-space: nowrap;
+    }
+    form {
+      display: flex;
+      gap: 0.5rem;
+      padding: 1rem 0;
+    }
+    input {
+      flex: 1;
+    }
+    input,
+    button {
+      padding: 0.6rem 0.9rem;
+      border: 1px solid rgb(127 127 127 / 50%);
+      border-radius: 0.5rem;
+      font: inherit;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Football agent</h1>
+    <p>Ask about the top 5 European leagues and the Champions League, or for a match prediction.</p>
+  </header>
+  <main id="messages" aria-live="polite"></main>
+  <form id="question-form">
+    <input id="question" type="text" placeholder="Who is top of Ligue 1?" autocomplete="off">
+    <button type="submit">Send</button>
+  </form>
+  <script>
+    const messages = document.querySelector("#messages");
+    const form = document.querySelector("#question-form");
+    const input = document.querySelector("#question");
+    const button = form.querySelector("button");
+    // The first answer can take a minute while Ollama loads the model into the GPU.
+    const TIMEOUT_MS = 3 * 60 * 1000;
+
+    function addMessage(kind, text) {
+      const message = document.createElement("div");
+      message.className = `message ${kind}`;
+      // textContent shows the text as is: HTML in an answer is never run.
+      message.textContent = text;
+      messages.append(message);
+      messages.scrollTop = messages.scrollHeight;
+      return message;
+    }
+
+    async function askAgent(question) {
+      let response;
+      try {
+        response = await fetch("/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question }),
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+      } catch (error) {
+        if (error.name === "TimeoutError") {
+          throw new Error("No answer after 3 minutes.");
+        }
+        throw new Error("Cannot reach the API. Is it running?");
+      }
+      // Errors raised outside our endpoint, such as a crash, are plain text rather than JSON.
+      const data = await response.json().catch(() => null);
+      if (response.ok && data !== null) {
+        return data.answer;
+      }
+      if (typeof data?.detail === "string") {
+        throw new Error(data.detail);
+      }
+      throw new Error(`Server error (${response.status}).`);
+    }
+
+    function showAnswer(message, text) {
+      // If a CDN script did not load, the answer is shown as plain text rather than not at all.
+      if (window.marked && window.DOMPurify) {
+        message.innerHTML = DOMPurify.sanitize(marked.parse(text));
+        message.className = "message agent markdown";
+      } else {
+        message.textContent = text;
+        message.className = "message agent";
+      }
+    }
+
+    function setWaiting(waiting) {
+      input.disabled = waiting;
+      button.disabled = waiting;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const question = input.value.trim();
+      if (question === "") {
+        return;
+      }
+      addMessage("user", question);
+      input.value = "";
+      setWaiting(true);
+      const reply = addMessage("thinking", "The agent is thinking…");
+      try {
+        showAnswer(reply, await askAgent(question));
+      } catch (error) {
+        reply.textContent = error.message;
+        reply.className = "message error";
+      } finally {
+        setWaiting(false);
+        input.focus();
+      }
+    });
+  </script>
+</body>
+</html>
