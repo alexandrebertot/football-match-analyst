@@ -2,7 +2,7 @@
 
 An LLM agent answers questions about the top 5 European leagues and the Champions League
 by calling tools (football-data.org API, a LightGBM match predictor). A small open model is
-later fine-tuned with QLoRA (distillation from a 7-8B teacher) to call tools reliably.
+later fine-tuned with QLoRA (distillation from a larger teacher model) to call tools reliably.
 
 ## Stack
 
@@ -20,8 +20,14 @@ src/football_agent/
   agent.py         # tool-calling loop
   llm.py           # LLM client config
   app.py           # FastAPI app
-  predictor/       # data loading, features, training, inference
-tests/
+  predictor/       # data download, features, training, registry, inference
+    team_names.yaml  # football-data.org team ids -> CSV team names, updated each season
+configs/
+  datasets/        # dataset configs: seasons, split, form window
+  training/        # training configs: features, LightGBM hyperparameters, early stopping
+ollama/Modelfile   # football-qwen: base model and context size
+Dockerfile, compose.yaml  # API image, run with docker compose
+tests/             # mirrors src/ (tests/predictor/ for the predictor)
 notebooks/         # exploration only, never imported by src/
 ```
 
@@ -33,7 +39,8 @@ notebooks/         # exploration only, never imported by src/
 - Tests: `uv run pytest`
 - API (needs Ollama running and a `champion` model in `mlflow.db`; refreshes the current season
   at start-up): `uv run --env-file .env uvicorn football_agent.app:app --reload`
-- Predictor data: `uv run python -m football_agent.predictor.data` (downloads the raw CSVs once)
+- Predictor data: `uv run python -m football_agent.predictor.data` (downloads each finished season
+  once and the season under way every time)
 - Predictor dataset: `uv run python -m football_agent.predictor.prepare --config configs/datasets/<name>.yaml`
   (rerun it after any change to the feature code: training reads the saved Parquet files)
 - Predictor training: `uv run python -m football_agent.predictor.train --config configs/training/<name>.yaml`

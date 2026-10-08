@@ -15,7 +15,7 @@ def client(
 ) -> Iterator[TestClient]:
     monkeypatch.setenv("FOOTBALL_DATA_API_KEY", "test-key")
     monkeypatch.setattr(app_module, "CACHE_PATH", tmp_path / "cache.sqlite")
-    # Start-up must not download the match history nor read the real MLflow registry.
+    # Start-up must neither download the match history nor read the real MLflow registry.
     monkeypatch.setattr(app_module, "download_history", lambda *args: None)
     monkeypatch.setattr(app_module, "load_predictor", lambda *args: fake_predictor)
     with TestClient(app_module.app) as test_client:

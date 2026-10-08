@@ -299,7 +299,7 @@ TOOL_SCHEMAS = [
                     "competition": LEAGUE_PARAMETER,
                     "match_date": {
                         "type": "string",
-                        "description": "Match day, YYYY-MM-DD. Omit it for today.",
+                        "description": "Match date, YYYY-MM-DD. Omit it for today.",
                     },
                 },
                 "required": ["home_team", "away_team", "competition"],
