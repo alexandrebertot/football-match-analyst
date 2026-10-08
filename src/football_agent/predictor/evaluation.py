@@ -38,3 +38,18 @@ def evaluate(probabilities: np.ndarray, results: pd.Series) -> dict[str, float]:
         "log_loss": log_loss(results, probabilities, labels=OUTCOMES),
         "accuracy": accuracy_score(results, predicted),
     }
+
+
+def compare_with_baselines(
+    probabilities: np.ndarray, train: pd.DataFrame, matches: pd.DataFrame
+) -> dict[str, float]:
+    """Score a model's `probabilities` on `matches`, along with the naive and market baselines.
+
+    The naive baseline uses the outcome frequencies of `train`, the seasons the model learned from.
+    """
+    results = matches["result"]
+    return {
+        **evaluate(probabilities, results),
+        "naive_log_loss": evaluate(naive_probabilities(train, len(matches)), results)["log_loss"],
+        "market_log_loss": evaluate(market_probabilities(matches), results)["log_loss"],
+    }
