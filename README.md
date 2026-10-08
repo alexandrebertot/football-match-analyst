@@ -7,22 +7,13 @@ calling tools: live data from the [football-data.org](https://www.football-data.
 LightGBM match outcome predictor. The LLM runs locally: Qwen 3.5 9B served by Ollama on a laptop
 GPU (RTX 4060, 8 GB).
 
-```bash
-curl -X POST http://localhost:8000/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question": "Who is top of the Premier League?"}'
-```
-
-Answer from a real run on 2026-10-07:
-
-> Man City is currently top of the Premier League with **15 points** after 5 matches this season
-> (2026-27). They have won all 5 of their games.
+![Chat page: the Premier League top 3, then Arsenal's next match with the model's prediction](docs/chat-page.png)
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    user([User]) -->|POST /ask| api[FastAPI]
+    user([Chat page]) -->|POST /ask| api[FastAPI]
     api --> agent[Agent loop]
     agent <-->|messages and tool calls| llm["Qwen 3.5 9B<br/>Ollama, local GPU"]
     agent --> tools{Tools}
@@ -77,7 +68,8 @@ Each run is tracked in MLflow, and the chosen one is registered as the `champion
 
 - [x] **Agent**: tool calling with football-data.org, FastAPI endpoint
 - [x] **Predictor and MLOps**: LightGBM model, MLflow tracking and registry, Docker, CI
-- [ ] **Chat page**: a local web page to talk with the agent, with follow-up questions
+- [x] **Chat page**: a local web page to talk with the agent
+- [ ] **Follow-up questions**: keep the conversation history, so that "and their next match?" works
 - [ ] **Evaluation**: a set of about 50 questions, scored on the right tool, valid arguments and
   exact figures, with results tracked in MLflow
 - [ ] **Better agent**: system prompt, tool outputs, thinking mode and model choice, each change
@@ -112,8 +104,14 @@ uv run python -m football_agent.predictor.registry --run plus-shots-on-target-ag
 uv run --env-file .env uvicorn football_agent.app:app
 ```
 
-Then send a question with the `curl` command shown at the top. Runs can be compared in the MLflow
-UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db`.
+Then open http://localhost:8000 and ask a question. The API can also be called directly:
+
+```bash
+curl -X POST http://localhost:8000/ask -H "Content-Type: application/json" \
+  -d '{"question": "Who is top of the Premier League?"}'
+```
+
+Runs can be compared in the MLflow UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db`.
 
 **With Docker**, after the predictor steps above:
 
@@ -133,7 +131,8 @@ src/football_agent/
   tools.py        # tool functions and their JSON schemas
   data_api.py     # football-data.org client with a SQLite cache
   llm.py          # LLM client (Ollama through the OpenAI-compatible API)
-  app.py          # FastAPI app
+  app.py          # FastAPI app: the chat page and the /ask endpoint
+  static/         # the chat page
   predictor/      # data download, features, training, registry, inference
 configs/          # dataset and training configs
 ollama/Modelfile  # LLM settings
