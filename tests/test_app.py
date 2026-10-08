@@ -22,6 +22,14 @@ def client(
         yield test_client
 
 
+def test_root_serves_the_chat_page(client: TestClient) -> None:
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert '<form id="question-form">' in response.text
+
+
 def test_ask_returns_the_agent_answer_with_the_loaded_predictor_and_today(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, fake_predictor: Any
 ) -> None:

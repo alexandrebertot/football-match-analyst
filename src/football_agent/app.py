@@ -6,6 +6,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from football_agent.agent import answer
@@ -16,6 +17,7 @@ from football_agent.predictor.predict import load_predictor
 from football_agent.tools import ToolContext
 
 CACHE_PATH = Path(".cache/football_data.sqlite")
+CHAT_PAGE_PATH = Path(__file__).with_name("static") / "index.html"
 
 
 class AskRequest(BaseModel):
@@ -40,6 +42,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Football agent", lifespan=lifespan)
+
+
+@app.get("/")
+def chat_page() -> FileResponse:
+    return FileResponse(CHAT_PAGE_PATH)
 
 
 @app.post("/ask")
