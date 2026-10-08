@@ -139,3 +139,7 @@ ollama/Modelfile  # LLM settings
 tests/
 notebooks/        # data exploration
 ```
+
+## License
+
+Apache 2.0, see [LICENSE](LICENSE).
