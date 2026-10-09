@@ -1,3 +1,4 @@
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -19,6 +20,8 @@ from football_agent.tools import ToolContext
 CACHE_PATH = Path(".cache/football_data.sqlite")
 CHAT_PAGE_PATH = Path(__file__).with_name("static") / "index.html"
 
+logger = logging.getLogger(__name__)
+
 
 class AskRequest(BaseModel):
     question: str = Field(min_length=1)
@@ -33,8 +36,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.llm = make_llm_client()
     app.state.http = make_http_client(os.environ["FOOTBALL_DATA_API_KEY"])
     # Predictions need this season's latest results, so the history is refreshed at start-up.
+    # If football-data.co.uk cannot be reached, the history of a previous start is good enough.
     with httpx.Client(timeout=30.0) as history_http:
-        download_history(history_http, RAW_DATA_DIR, date.today())
+        try:
+            download_history(history_http, RAW_DATA_DIR, date.today())
+        except httpx.HTTPError as error:
+            logger.warning(
+                "Could not refresh the match history, using the files already downloaded: %s",
+                error,
+            )
     app.state.predictor = load_predictor(RAW_DATA_DIR, date.today())
     yield
     app.state.http.close()

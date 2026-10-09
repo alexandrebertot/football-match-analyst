@@ -1,8 +1,10 @@
+import logging
 from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,14 +12,16 @@ from football_agent import app as app_module
 
 
 @pytest.fixture
-def client(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake_predictor: Any
-) -> Iterator[TestClient]:
+def startup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake_predictor: Any) -> None:
     monkeypatch.setenv("FOOTBALL_DATA_API_KEY", "test-key")
     monkeypatch.setattr(app_module, "CACHE_PATH", tmp_path / "cache.sqlite")
     # Start-up must neither download the match history nor read the real MLflow registry.
     monkeypatch.setattr(app_module, "download_history", lambda *args: None)
     monkeypatch.setattr(app_module, "load_predictor", lambda *args: fake_predictor)
+
+
+@pytest.fixture
+def client(startup: None) -> Iterator[TestClient]:
     with TestClient(app_module.app) as test_client:
         yield test_client
 
@@ -78,3 +82,21 @@ def test_app_refuses_to_start_without_api_key(monkeypatch: pytest.MonkeyPatch) -
 
     with pytest.raises(KeyError, match="FOOTBALL_DATA_API_KEY"), TestClient(app_module.app):
         pass
+
+
+def test_app_starts_with_the_downloaded_history_when_the_refresh_fails(
+    startup: None,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    fake_predictor: Any,
+) -> None:
+    def unreachable_site(*args: Any) -> None:
+        raise httpx.ConnectError("football-data.co.uk is unreachable")
+
+    monkeypatch.setattr(app_module, "download_history", unreachable_site)
+
+    with caplog.at_level(logging.WARNING), TestClient(app_module.app):
+        assert app_module.app.state.predictor is fake_predictor
+
+    assert "Could not refresh the match history" in caplog.text
+    assert "football-data.co.uk is unreachable" in caplog.text
