@@ -1,9 +1,8 @@
 import unicodedata
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
+from typing import Any, Protocol
 
-from football_agent.data_api import FootballDataClient
 from football_agent.predictor.data import LEAGUE_FILES
 from football_agent.predictor.predict import MatchPredictor
 
@@ -130,11 +129,23 @@ def summarize_team_form(raw: dict[str, Any], team: dict[str, Any]) -> dict[str, 
     }
 
 
+class FootballData(Protocol):
+    """The football data the tools read: the live API client, or a recorded snapshot."""
+
+    def get_standings(self, competition: str, season: int | None = None) -> dict[str, Any]: ...
+
+    def get_teams(self, competition: str) -> dict[str, Any]: ...
+
+    def get_matches(self, competition: str, date_from: date, date_to: date) -> dict[str, Any]: ...
+
+    def get_team_matches(self, team_id: int, competition: str, limit: int) -> dict[str, Any]: ...
+
+
 @dataclass
 class ToolContext:
     """What the tools need besides the arguments chosen by the LLM."""
 
-    football: FootballDataClient
+    football: FootballData
     predictor: MatchPredictor
     today: date
 
@@ -185,13 +196,14 @@ TOOL_FUNCTIONS = {
     "predict_match": predict_match,
 }
 
+COMPETITIONS = [*LEAGUE_FILES, "CL"]
 LEAGUES_DESCRIPTION = (
     "PL = Premier League (England), FL1 = Ligue 1 (France), BL1 = Bundesliga (Germany), "
     "SA = Serie A (Italy), PD = La Liga (Spain)"
 )
 COMPETITION_PARAMETER = {
     "type": "string",
-    "enum": [*LEAGUE_FILES, "CL"],
+    "enum": COMPETITIONS,
     "description": f"Competition code: {LEAGUES_DESCRIPTION}, CL = UEFA Champions League.",
 }
 LEAGUE_PARAMETER = {
