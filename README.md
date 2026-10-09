@@ -27,7 +27,8 @@ The agent sends the question and the tools' JSON schemas to the LLM, runs the to
 for and sends the results back, until the LLM answers in text. Tool errors, such as an unknown team
 name, go back to the LLM as messages so that it can fix its arguments. The loop is written by hand,
 without a framework, so that the exact conversation format is known: it is what the fine-tuning
-step will reproduce.
+step will reproduce. Every question is traced in MLflow: each LLM call with its prompt and tokens,
+and each tool call with its arguments and result.
 
 | Tool | Returns |
 | --- | --- |
@@ -70,6 +71,7 @@ Each run is tracked in MLflow, and the chosen one is registered as the `champion
 - [x] **Agent**: tool calling with football-data.org, FastAPI endpoint
 - [x] **Predictor and MLOps**: LightGBM model, MLflow tracking and registry, Docker, CI
 - [x] **Chat page**: a local web page to talk with the agent
+- [x] **Tracing**: every question recorded in MLflow, with its LLM calls, tool calls and tokens
 - [ ] **Follow-up questions**: keep the conversation history, so that "and their next match?" works
 - [ ] **Evaluation**: a set of about 50 questions, scored on the right tool, valid arguments and
   exact figures, with results tracked in MLflow
@@ -113,7 +115,9 @@ curl -X POST http://localhost:8000/ask -H "Content-Type: application/json" \
   -d '{"question": "Who is top of the Premier League?"}'
 ```
 
-Runs can be compared in the MLflow UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db`.
+The MLflow UI shows the training runs (experiment `match-outcome`) and the trace of every question
+asked to the API (experiment `agent-traces`, Traces tab):
+`uv run mlflow ui --backend-store-uri sqlite:///mlflow.db`.
 
 **With Docker**, after the predictor steps above:
 

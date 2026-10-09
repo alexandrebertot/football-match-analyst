@@ -4,9 +4,23 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+import mlflow
 import pytest
 
 from football_agent.data_api import open_cache
+
+
+@pytest.fixture(autouse=True, scope="session")
+def no_tracing() -> None:
+    # Otherwise every agent test would write a trace into the repository's mlflow.db.
+    mlflow.tracing.disable()
+
+
+@pytest.fixture
+def tracking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # MLflow writes its database and artifacts relative to the working directory.
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", f"sqlite:///{tmp_path / 'mlflow.db'}")
 
 
 @pytest.fixture

@@ -15,7 +15,8 @@ from football_agent import app as app_module
 def startup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake_predictor: Any) -> None:
     monkeypatch.setenv("FOOTBALL_DATA_API_KEY", "test-key")
     monkeypatch.setattr(app_module, "CACHE_PATH", tmp_path / "cache.sqlite")
-    # Start-up must neither download the match history nor read the real MLflow registry.
+    # Start-up must not download the match history, nor read or write the real MLflow database.
+    monkeypatch.setattr(app_module, "start_tracing", lambda: None)
     monkeypatch.setattr(app_module, "download_history", lambda *args: None)
     monkeypatch.setattr(app_module, "load_predictor", lambda *args: fake_predictor)
 
@@ -77,8 +78,10 @@ def test_ask_turns_agent_failure_into_bad_gateway(
     assert response.json() == {"detail": "No answer after 5 rounds of tool calls."}
 
 
-def test_app_refuses_to_start_without_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("FOOTBALL_DATA_API_KEY", raising=False)
+def test_app_refuses_to_start_without_api_key(
+    startup: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("FOOTBALL_DATA_API_KEY")
 
     with pytest.raises(KeyError, match="FOOTBALL_DATA_API_KEY"), TestClient(app_module.app):
         pass
