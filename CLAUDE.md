@@ -50,7 +50,8 @@ notebooks/         # exploration only, never imported by src/
   `champion` alias to it; the agent always loads `models:/match-outcome@champion`)
 - Predictor final score: `uv run python -m football_agent.predictor.final_score` (scores the champion
   once on its held-out test seasons and records it in its MLflow run; later calls return that score)
-- MLflow UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db`
+- MLflow UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db` (experiment `match-outcome`:
+  training runs; experiment `agent-traces`: one trace per question asked to the API)
 
 ## Code rules
 

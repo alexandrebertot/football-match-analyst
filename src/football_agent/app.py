@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 
 import httpx
+import mlflow
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -19,6 +20,7 @@ from football_agent.tools import ToolContext
 
 CACHE_PATH = Path(".cache/football_data.sqlite")
 CHAT_PAGE_PATH = Path(__file__).with_name("static") / "index.html"
+TRACES_EXPERIMENT = "agent-traces"
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +33,15 @@ class AskResponse(BaseModel):
     answer: str
 
 
+def start_tracing() -> None:
+    """Record every question asked to the API as an MLflow trace, LLM calls included."""
+    mlflow.set_experiment(TRACES_EXPERIMENT)
+    mlflow.openai.autolog()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    start_tracing()
     app.state.llm = make_llm_client()
     app.state.http = make_http_client(os.environ["FOOTBALL_DATA_API_KEY"])
     # Predictions need this season's latest results, so the history is refreshed at start-up.
@@ -49,6 +58,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
     app.state.http.close()
     app.state.llm.close()
+    # Traces are written in the background: finish writing them before the process exits.
+    mlflow.flush_trace_async_logging()
 
 
 app = FastAPI(title="Football agent", lifespan=lifespan)

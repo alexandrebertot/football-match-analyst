@@ -1,12 +1,15 @@
 import copy
 import json
 import sqlite3
+from collections.abc import Iterator
 from datetime import date
 from types import SimpleNamespace
 from typing import Any
 
 import httpx
+import mlflow
 import pytest
+from mlflow.entities import SpanType, TraceState
 from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall
 
 from football_agent.agent import MAX_TOOL_ROUNDS, answer, build_system_prompt, run_tool_call
@@ -190,3 +193,54 @@ def test_answer_refuses_an_empty_reply(cache: sqlite3.Connection, content: str |
 
     with pytest.raises(RuntimeError, match="neither text nor a tool call"):
         answer("Classement ?", llm, tool_context(cache))
+
+
+@pytest.fixture
+def tracing(tracking: None) -> Iterator[None]:
+    # The active experiment is global: an earlier test may have left one from another database.
+    mlflow.set_experiment("agent-traces-test")
+    mlflow.tracing.enable()
+    yield
+    mlflow.tracing.disable()
+
+
+def last_trace() -> mlflow.entities.Trace:
+    # Traces are written in the background: wait for the write before reading it back.
+    mlflow.flush_trace_async_logging()
+    return mlflow.get_trace(mlflow.get_last_active_trace_id())
+
+
+def test_answer_traces_the_question_each_tool_call_and_the_answer(
+    tracing: None, cache: sqlite3.Connection
+) -> None:
+    llm = FakeLLM(
+        [
+            tool_reply("get_standings", '{"competition": "FL1"}'),
+            text_reply("Monaco est premier."),
+        ]
+    )
+
+    answer("Qui est premier en Ligue 1 ?", llm, tool_context(cache))
+
+    trace = last_trace()
+    spans = {span.name: span for span in trace.data.spans}
+    assert spans["answer"].span_type == SpanType.AGENT
+    assert spans["answer"].inputs == {"question": "Qui est premier en Ligue 1 ?"}
+    assert spans["answer"].outputs == {"answer": "Monaco est premier."}
+    tool_span = spans["get_standings"]
+    assert tool_span.span_type == SpanType.TOOL
+    assert tool_span.parent_id == spans["answer"].span_id
+    assert tool_span.inputs == {"arguments": '{"competition": "FL1"}'}
+    assert "Monaco" in tool_span.outputs["result"]
+
+
+def test_answer_trace_is_marked_as_failed_when_the_agent_gives_up(
+    tracing: None, cache: sqlite3.Connection
+) -> None:
+    llm = FakeLLM([text_reply("")])
+
+    with pytest.raises(RuntimeError):
+        answer("Classement ?", llm, tool_context(cache))
+
+    trace = last_trace()
+    assert trace.info.state == TraceState.ERROR

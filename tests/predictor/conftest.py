@@ -88,12 +88,5 @@ def training_config() -> TrainingConfig:
 
 
 @pytest.fixture
-def tracking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # MLflow writes its database and artifacts relative to the working directory.
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("MLFLOW_TRACKING_URI", f"sqlite:///{tmp_path / 'mlflow.db'}")
-
-
-@pytest.fixture
 def dataset_dir(tmp_path: Path, league: pd.DataFrame, dataset_config: DatasetConfig) -> Path:
     return prepare_dataset(league, dataset_config, tmp_path / "processed")

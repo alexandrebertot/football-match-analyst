@@ -3,6 +3,8 @@ from datetime import date
 from typing import Any
 
 import httpx
+import mlflow
+from mlflow.entities import SpanType
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageToolCall
 
@@ -34,28 +36,46 @@ def run_tool_call(context: ToolContext, tool_call: ChatCompletionMessageToolCall
 
 
 def answer(question: str, llm: OpenAI, context: ToolContext) -> str:
-    """Answer `question`, letting the LLM call the football tools until it replies with text."""
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": build_system_prompt(context.today)},
-        {"role": "user", "content": question},
-    ]
-    for _ in range(MAX_TOOL_ROUNDS):
-        response = llm.chat.completions.create(model=MODEL, messages=messages, tools=TOOL_SCHEMAS)
-        choice = response.choices[0]
-        if choice.finish_reason == "length":
-            raise RuntimeError("The LLM reply was cut off because its context window is full.")
-        message = choice.message
-        if not message.tool_calls:
-            if not message.content or not message.content.strip():
-                raise RuntimeError("The LLM replied with neither text nor a tool call.")
-            return message.content
-        messages.append(message.model_dump(exclude_none=True))
-        for tool_call in message.tool_calls:
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": run_tool_call(context, tool_call),
-                }
+    """Answer `question`, letting the LLM call the football tools until it replies with text.
+
+    When tracing is on, the question becomes a trace: one span for the whole answer and one per
+    tool call, while MLflow's openai autolog adds a span for each LLM call.
+    """
+    with mlflow.start_span(name="answer", span_type=SpanType.AGENT) as span:
+        span.set_inputs({"question": question})
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": build_system_prompt(context.today)},
+            {"role": "user", "content": question},
+        ]
+        for _ in range(MAX_TOOL_ROUNDS):
+            response = llm.chat.completions.create(
+                model=MODEL, messages=messages, tools=TOOL_SCHEMAS
             )
-    raise RuntimeError(f"No answer after {MAX_TOOL_ROUNDS} rounds of tool calls.")
+            choice = response.choices[0]
+            if choice.finish_reason == "length":
+                raise RuntimeError("The LLM reply was cut off because its context window is full.")
+            message = choice.message
+            if not message.tool_calls:
+                if not message.content or not message.content.strip():
+                    raise RuntimeError("The LLM replied with neither text nor a tool call.")
+                span.set_outputs({"answer": message.content})
+                return message.content
+            messages.append(message.model_dump(exclude_none=True))
+            for tool_call in message.tool_calls:
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": traced_tool_call(context, tool_call),
+                    }
+                )
+        raise RuntimeError(f"No answer after {MAX_TOOL_ROUNDS} rounds of tool calls.")
+
+
+def traced_tool_call(context: ToolContext, tool_call: ChatCompletionMessageToolCall) -> str:
+    """Run one tool call inside a span named after the tool, with its arguments and full result."""
+    with mlflow.start_span(name=tool_call.function.name, span_type=SpanType.TOOL) as span:
+        span.set_inputs({"arguments": tool_call.function.arguments})
+        result = run_tool_call(context, tool_call)
+        span.set_outputs({"result": result})
+        return result
