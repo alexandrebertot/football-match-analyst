@@ -22,6 +22,7 @@ src/football_agent/
   app.py           # FastAPI app: chat page at /, agent at POST /ask
   static/          # chat page (HTML, CSS, JavaScript in one file)
   predictor/       # data download, features, training, registry, inference
+  agent_eval/      # agent evaluation: data snapshots replayed to the tools
     team_names.yaml  # football-data.org team ids -> CSV team names, updated each season
 configs/
   datasets/        # dataset configs: seasons, split, form window
@@ -50,6 +51,9 @@ notebooks/         # exploration only, never imported by src/
   `champion` alias to it; the agent always loads `models:/match-outcome@champion`)
 - Predictor final score: `uv run python -m football_agent.predictor.final_score` (scores the champion
   once on its held-out test seasons and records it in its MLflow run; later calls return that score)
+- Evaluation snapshot: `uv run --env-file .env python -m football_agent.agent_eval.snapshot`
+  (records the standings, teams and season matches of every competition into
+  `data/snapshots/<date>.json`, about 2 minutes because of the API rate limit)
 - MLflow UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db` (experiment `match-outcome`:
   training runs; experiment `agent-traces`: one trace per question asked to the API)
 
