@@ -38,9 +38,12 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+src = [".", "src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Lets tests import the shared fakes in tests/fakes.py.
+pythonpath = ["tests"]
