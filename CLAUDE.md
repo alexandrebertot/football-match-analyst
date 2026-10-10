@@ -22,8 +22,9 @@ src/football_agent/
   app.py           # FastAPI app: chat page at /, agent at POST /ask
   static/          # chat page (HTML, CSS, JavaScript in one file)
   predictor/       # data download, features, training, registry, inference
-  agent_eval/      # agent evaluation: data snapshots replayed to the tools
     team_names.yaml  # football-data.org team ids -> CSV team names, updated each season
+  agent_eval/      # agent evaluation: data snapshots replayed to the tools, questions generated
+                   # from them with their expected facts, answer scoring
 configs/
   datasets/        # dataset configs: seasons, split, form window
   training/        # training configs: features, LightGBM hyperparameters, early stopping
