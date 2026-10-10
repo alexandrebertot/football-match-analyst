@@ -1,17 +1,14 @@
-import copy
 import json
 import sqlite3
-from collections.abc import Iterator
 from datetime import date
-from types import SimpleNamespace
-from typing import Any
 
 import httpx
 import mlflow
 import pytest
 from mlflow.entities import SpanType, TraceState
-from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall
+from openai.types.chat import ChatCompletionMessageToolCall
 
+from fakes import FakeLLM, text_reply, tool_reply
 from football_agent.agent import MAX_TOOL_ROUNDS, answer, build_system_prompt, run_tool_call
 from football_agent.data_api import BASE_URL, FootballDataClient
 from football_agent.llm import MODEL
@@ -41,44 +38,6 @@ STANDINGS = {
         }
     ],
 }
-
-
-class FakeLLM:
-    """Stand-in for the OpenAI client: returns scripted choices, records each request."""
-
-    def __init__(self, replies: list[dict[str, Any]]) -> None:
-        self.replies = iter(replies)
-        self.requests: list[dict[str, Any]] = []
-        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
-
-    def create(self, **request: Any) -> ChatCompletion:
-        # The agent keeps appending to the same messages list, so keep a snapshot of this call.
-        self.requests.append(copy.deepcopy(request))
-        return ChatCompletion.model_validate(
-            {
-                "id": "fake",
-                "object": "chat.completion",
-                "created": 0,
-                "model": MODEL,
-                "choices": [{"index": 0, **next(self.replies)}],
-            }
-        )
-
-
-def text_reply(content: str | None, finish_reason: str = "stop") -> dict[str, Any]:
-    return {"finish_reason": finish_reason, "message": {"role": "assistant", "content": content}}
-
-
-def tool_reply(name: str, arguments: str) -> dict[str, Any]:
-    tool_call = {
-        "id": "call_1",
-        "type": "function",
-        "function": {"name": name, "arguments": arguments},
-    }
-    return {
-        "finish_reason": "tool_calls",
-        "message": {"role": "assistant", "content": None, "tool_calls": [tool_call]},
-    }
 
 
 def tool_context(cache: sqlite3.Connection, status_code: int = 200) -> ToolContext:
@@ -193,15 +152,6 @@ def test_answer_refuses_an_empty_reply(cache: sqlite3.Connection, content: str |
 
     with pytest.raises(RuntimeError, match="neither text nor a tool call"):
         answer("Classement ?", llm, tool_context(cache))
-
-
-@pytest.fixture
-def tracing(tracking: None) -> Iterator[None]:
-    # The active experiment is global: an earlier test may have left one from another database.
-    mlflow.set_experiment("agent-traces-test")
-    mlflow.tracing.enable()
-    yield
-    mlflow.tracing.disable()
 
 
 def last_trace() -> mlflow.entities.Trace:

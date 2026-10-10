@@ -55,8 +55,13 @@ notebooks/         # exploration only, never imported by src/
 - Evaluation snapshot: `uv run --env-file .env python -m football_agent.agent_eval.snapshot`
   (records the standings, teams and season matches of every competition into
   `data/snapshots/<date>.json`, about 2 minutes because of the API rate limit)
+- Agent evaluation (needs Ollama running, about 1 to 1.5 hours with 3 passes):
+  `uv run python -m football_agent.agent_eval.run --snapshot data/snapshots/<date>.json --passes 3`
+  (asks every generated question once per pass, scores each answer from its trace, and records
+  the run with its traces and the success rate with its 95% confidence interval)
 - MLflow UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db` (experiment `match-outcome`:
-  training runs; experiment `agent-traces`: one trace per question asked to the API)
+  training runs; experiment `agent-traces`: one trace per question asked to the API; experiment
+  `agent-evaluation`: one run per evaluation, each answer with its trace and scores)
 
 ## Code rules
 

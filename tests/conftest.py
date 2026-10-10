@@ -24,6 +24,15 @@ def tracking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
+def tracing(tracking: None) -> Iterator[None]:
+    # The active experiment is global: an earlier test may have left one from another database.
+    mlflow.set_experiment("agent-traces-test")
+    mlflow.tracing.enable()
+    yield
+    mlflow.tracing.disable()
+
+
+@pytest.fixture
 def cache(tmp_path: Path) -> Iterator[sqlite3.Connection]:
     db = open_cache(tmp_path / "cache" / "responses.sqlite")
     yield db
