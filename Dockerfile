@@ -21,4 +21,7 @@ RUN useradd --uid 1000 app
 USER app
 
 ENV PATH="/app/.venv/bin:$PATH"
+# Start-up refreshes the match history and loads the model, hence the grace period.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=8)"]
 CMD ["uvicorn", "football_agent.app:app", "--host", "0.0.0.0", "--port", "8000"]
