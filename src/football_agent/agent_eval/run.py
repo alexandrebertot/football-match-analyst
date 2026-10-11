@@ -36,6 +36,7 @@ def evaluation_data(
             "expectations": {
                 "tools": list(ACCEPTED_TOOLS[case.kind]),
                 "competition": case.competition,
+                "language": case.language,
                 "facts": [
                     {"description": fact.description, "spellings": list(fact.spellings)}
                     for fact in case_facts
@@ -45,6 +46,7 @@ def evaluation_data(
                 "model": model,
                 "kind": case.kind,
                 "competition": case.competition,
+                "language": case.language,
                 "pass": str(number),
             },
         }
@@ -88,6 +90,7 @@ def answer_score(outputs: str | None, expectations: dict[str, Any], trace: Trace
         tuple(expectations["tools"]),
         expectations["competition"],
         facts,
+        expectations["language"],
     )
     missing = [fact.description for fact in facts if not fact_found(fact, text)]
     if outputs is None:

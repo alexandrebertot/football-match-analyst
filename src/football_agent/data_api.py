@@ -57,8 +57,18 @@ class FootballDataClient:
     def get_teams(self, competition: str) -> dict[str, Any]:
         return self._get(f"/competitions/{competition}/teams", {})
 
-    def get_matches(self, competition: str, date_from: date, date_to: date) -> dict[str, Any]:
-        params = {"dateFrom": date_from.isoformat(), "dateTo": date_to.isoformat()}
+    def get_matches(
+        self,
+        competition: str,
+        date_from: date | None,
+        date_to: date | None,
+        matchday: int | None = None,
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {}
+        if date_from is not None and date_to is not None:
+            params |= {"dateFrom": date_from.isoformat(), "dateTo": date_to.isoformat()}
+        if matchday is not None:
+            params["matchday"] = matchday
         return self._get(f"/competitions/{competition}/matches", params)
 
     def get_team_matches(self, team_id: int, competition: str, limit: int) -> dict[str, Any]:

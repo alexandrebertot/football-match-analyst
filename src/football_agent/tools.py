@@ -135,7 +135,13 @@ class FootballData(Protocol):
 
     def get_teams(self, competition: str) -> dict[str, Any]: ...
 
-    def get_matches(self, competition: str, date_from: date, date_to: date) -> dict[str, Any]: ...
+    def get_matches(
+        self,
+        competition: str,
+        date_from: date | None,
+        date_to: date | None,
+        matchday: int | None = None,
+    ) -> dict[str, Any]: ...
 
     def get_team_matches(self, team_id: int, competition: str, limit: int) -> dict[str, Any]: ...
 
@@ -158,14 +164,18 @@ def get_standings(
 def get_matches(
     context: ToolContext,
     competition: str,
-    date_from: str,
-    date_to: str,
+    date_from: str | None = None,
+    date_to: str | None = None,
     team_name: str | None = None,
+    matchday: int | None = None,
 ) -> list[dict[str, Any]]:
-    raw = context.football.get_matches(
-        competition, date.fromisoformat(date_from), date.fromisoformat(date_to)
-    )
-    matches = raw["matches"]
+    if (date_from is None) != (date_to is None):
+        raise ValueError("Give both date_from and date_to, or neither.")
+    if date_from is None and matchday is None:
+        raise ValueError("Give a period (date_from and date_to), a matchday, or both.")
+    first_day = date.fromisoformat(date_from) if date_from else None
+    last_day = date.fromisoformat(date_to) if date_to else None
+    matches = context.football.get_matches(competition, first_day, last_day, matchday)["matches"]
     if team_name is not None:
         team = find_team(context.football.get_teams(competition)["teams"], team_name)
         matches = [
@@ -261,17 +271,28 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "get_matches",
             "description": (
-                "Get the matches of a competition between two dates, both included: date, "
-                "weekday and matchday, final and half-time scores of finished matches, status of "
-                f"upcoming ones. A result holds at most {MAX_MATCHES} matches: give a team to get "
-                "only its matches, for example all its remaining matches of the season."
+                "Get the matches of a competition over a period (both days included), a "
+                "matchday, or both: date, weekday and matchday, final and half-time scores of "
+                f"finished matches, status of upcoming ones. A result holds at most {MAX_MATCHES} "
+                "matches: give a team to get only its matches, for example all its remaining "
+                "matches of the season."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "competition": COMPETITION_PARAMETER,
-                    "date_from": {"type": "string", "description": "First day, YYYY-MM-DD."},
-                    "date_to": {"type": "string", "description": "Last day, YYYY-MM-DD."},
+                    "date_from": {
+                        "type": "string",
+                        "description": "First day, YYYY-MM-DD. Give it with date_to.",
+                    },
+                    "date_to": {
+                        "type": "string",
+                        "description": "Last day, YYYY-MM-DD. Give it with date_from.",
+                    },
+                    "matchday": {
+                        "type": "integer",
+                        "description": "Matchday (round) of the competition, e.g. 7.",
+                    },
                     "team_name": {
                         "type": "string",
                         "description": (
@@ -280,7 +301,7 @@ TOOL_SCHEMAS = [
                         ),
                     },
                 },
-                "required": ["competition", "date_from", "date_to"],
+                "required": ["competition"],
             },
         },
     },

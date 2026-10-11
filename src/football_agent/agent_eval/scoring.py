@@ -51,10 +51,10 @@ def fact_found(fact: Fact, answer: str) -> bool:
     )
 
 
-def answered_in_english(answer: str) -> bool:
-    """Whether the answer is written in English, as the questions are."""
+def answered_in(answer: str, language: str) -> bool:
+    """Whether the answer is written in `language` ('en', 'fr'…), the language of its question."""
     try:
-        return detect(answer) == "en"
+        return detect(answer) == language
     except LangDetectException:
         # An answer without any letter (empty, or only figures) is in no language.
         return False
@@ -73,6 +73,7 @@ def score_case(
     tools: tuple[str, ...],
     competition: str,
     facts: list[Fact],
+    language: str,
 ) -> dict[str, Any]:
     """Score one answer: right tool, facts stated, language, and tool calls that failed along
     the way.
@@ -81,7 +82,7 @@ def score_case(
     """
     found = sum(fact_found(fact, answer) for fact in facts)
     right_tool = called_expected_tool(calls, tools, competition)
-    right_language = answered_in_english(answer)
+    right_language = answered_in(answer, language)
     return {
         "right_tool": right_tool,
         "facts_found": found,

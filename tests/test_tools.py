@@ -282,6 +282,33 @@ def test_get_matches_tool_converts_iso_dates(cache: sqlite3.Connection) -> None:
     assert requests[0].url.params["dateTo"] == "2026-09-20"
 
 
+def test_get_matches_tool_asks_for_a_matchday_without_dates(cache: sqlite3.Connection) -> None:
+    requests: list[httpx.Request] = []
+    context = tool_context(cache, {"/v4/competitions/FL1/matches": {"matches": []}}, requests)
+
+    assert get_matches(context, "FL1", matchday=5) == []
+    assert dict(requests[0].url.params) == {"matchday": "5"}
+
+
+@pytest.mark.parametrize(
+    ("dates", "message"),
+    [
+        ({}, "Give a period"),
+        ({"date_from": "2026-10-09"}, "Give both date_from and date_to"),
+    ],
+)
+def test_get_matches_tool_needs_a_whole_period_or_a_matchday(
+    cache: sqlite3.Connection, dates: dict[str, str], message: str
+) -> None:
+    requests: list[httpx.Request] = []
+    context = tool_context(cache, {}, requests)
+
+    with pytest.raises(ValueError, match=message):
+        get_matches(context, "FL1", **dates)
+
+    assert requests == []
+
+
 def test_get_matches_tool_rejects_malformed_date_before_calling_api(
     cache: sqlite3.Connection,
 ) -> None:
