@@ -290,21 +290,37 @@ def test_get_matches_tool_asks_for_a_matchday_without_dates(cache: sqlite3.Conne
     assert dict(requests[0].url.params) == {"matchday": "5"}
 
 
-@pytest.mark.parametrize(
-    ("dates", "message"),
-    [
-        ({}, "Give a period"),
-        ({"date_from": "2026-10-09"}, "Give both date_from and date_to"),
-    ],
-)
-def test_get_matches_tool_needs_a_whole_period_or_a_matchday(
-    cache: sqlite3.Connection, dates: dict[str, str], message: str
+def test_get_matches_tool_gives_the_whole_season_of_a_team(cache: sqlite3.Connection) -> None:
+    requests: list[httpx.Request] = []
+    paris_fc = make_match("Paris FC", "Strasbourg", {"home": 2, "away": 1}, "FINISHED")
+    lyon_psg = make_match("Olympique Lyon", "PSG", {"home": None, "away": None}, "TIMED")
+    lyon_psg["homeTeam"]["id"], lyon_psg["awayTeam"]["id"] = 523, 524
+    responses = {
+        "/v4/competitions/FL1/matches": {"matches": [paris_fc, lyon_psg]},
+        "/v4/competitions/FL1/teams": {"teams": TEAMS},
+    }
+    context = tool_context(cache, responses, requests)
+
+    assert get_matches(context, "FL1", team_name="PSG") == [summarize_match(lyon_psg)]
+    assert dict(requests[0].url.params) == {}
+
+
+def test_get_matches_tool_refuses_a_whole_season_of_a_competition(
+    cache: sqlite3.Connection,
 ) -> None:
+    match = make_match("Paris FC", "Strasbourg", {"home": None, "away": None}, "TIMED")
+    context = tool_context(cache, {"/v4/competitions/FL1/matches": {"matches": [match] * 306}}, [])
+
+    with pytest.raises(ValueError, match="give a team_name, a matchday, or a shorter period"):
+        get_matches(context, "FL1")
+
+
+def test_get_matches_tool_needs_both_ends_of_a_period(cache: sqlite3.Connection) -> None:
     requests: list[httpx.Request] = []
     context = tool_context(cache, {}, requests)
 
-    with pytest.raises(ValueError, match=message):
-        get_matches(context, "FL1", **dates)
+    with pytest.raises(ValueError, match="Give both date_from and date_to"):
+        get_matches(context, "FL1", date_from="2026-10-09")
 
     assert requests == []
 
