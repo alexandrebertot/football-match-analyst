@@ -8,12 +8,13 @@ from pathlib import Path
 import httpx
 import mlflow
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from openai import APIConnectionError, APITimeoutError
 from pydantic import BaseModel, Field
 
 from football_agent.agent import answer
 from football_agent.data_api import FootballDataClient, make_http_client, open_cache
-from football_agent.llm import make_llm_client
+from football_agent.llm import LLM_TIMEOUT_SECONDS, make_llm_client
 from football_agent.predictor.data import RAW_DATA_DIR, download_history
 from football_agent.predictor.predict import load_predictor
 from football_agent.tools import ToolContext
@@ -21,6 +22,8 @@ from football_agent.tools import ToolContext
 CACHE_PATH = Path(".cache/football_data.sqlite")
 CHAT_PAGE_PATH = Path(__file__).with_name("static") / "index.html"
 TRACES_EXPERIMENT = "agent-traces"
+# A health probe runs every few seconds: it must not wait as long as a question.
+HEALTH_TIMEOUT_SECONDS = 5
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +73,19 @@ def chat_page() -> FileResponse:
     return FileResponse(CHAT_PAGE_PATH)
 
 
+@app.get("/health")
+def health(request: Request) -> JSONResponse:
+    """Whether the API can answer: Ollama must reply. football-data.org is not probed, as each
+    probe would use up its quota of 10 requests a minute."""
+    try:
+        request.app.state.llm.with_options(timeout=HEALTH_TIMEOUT_SECONDS).models.list()
+    except APIConnectionError as error:
+        return JSONResponse(
+            status_code=503, content={"status": "unavailable", "detail": f"Ollama: {error}"}
+        )
+    return JSONResponse(content={"status": "ok"})
+
+
 @app.post("/ask")
 def ask(body: AskRequest, request: Request) -> AskResponse:
     # One SQLite connection per request: FastAPI runs sync endpoints in a thread pool,
@@ -84,6 +100,13 @@ def ask(body: AskRequest, request: Request) -> AskResponse:
         reply = answer(body.question, request.app.state.llm, context)
     except RuntimeError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
+    # APITimeoutError is a kind of APIConnectionError, so it must be caught first.
+    except APITimeoutError as error:
+        detail = f"The language model did not answer within {LLM_TIMEOUT_SECONDS} seconds."
+        raise HTTPException(status_code=503, detail=detail) from error
+    except APIConnectionError as error:
+        detail = "The language model is unreachable: is Ollama running?"
+        raise HTTPException(status_code=503, detail=detail) from error
     finally:
         cache.close()
     return AskResponse(answer=reply)

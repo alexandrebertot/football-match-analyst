@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from openai import APIConnectionError, APITimeoutError
 
 from football_agent import app as app_module
 
@@ -76,6 +77,90 @@ def test_ask_turns_agent_failure_into_bad_gateway(
 
     assert response.status_code == 502
     assert response.json() == {"detail": "No answer after 5 rounds of tool calls."}
+
+
+OLLAMA_REQUEST = httpx.Request("POST", "http://localhost:11434/v1/chat/completions")
+
+
+@pytest.mark.parametrize(
+    ("error", "detail"),
+    [
+        (
+            APIConnectionError(request=OLLAMA_REQUEST),
+            "The language model is unreachable: is Ollama running?",
+        ),
+        (
+            APITimeoutError(request=OLLAMA_REQUEST),
+            "The language model did not answer within 120 seconds.",
+        ),
+    ],
+    ids=["ollama-down", "ollama-stuck"],
+)
+def test_ask_turns_an_unavailable_llm_into_service_unavailable(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, error: Exception, detail: str
+) -> None:
+    def failing_answer(*args: Any) -> str:
+        raise error
+
+    monkeypatch.setattr(app_module, "answer", failing_answer)
+
+    response = client.post("/ask", json={"question": "Classement ?"})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": detail}
+
+
+class FakeModels:
+    def __init__(self, error: Exception | None) -> None:
+        self.error = error
+
+    def list(self) -> list[Any]:
+        if self.error is not None:
+            raise self.error
+        return []
+
+
+class FakeHealthLLM:
+    """Stand-in for the OpenAI client: lists Ollama's models, or fails like a down Ollama."""
+
+    def __init__(self, error: Exception | None = None) -> None:
+        self.models = FakeModels(error)
+        self.timeouts: list[float] = []
+
+    def with_options(self, timeout: float) -> "FakeHealthLLM":
+        self.timeouts.append(timeout)
+        return self
+
+    def close(self) -> None:
+        pass
+
+
+def get_health(monkeypatch: pytest.MonkeyPatch, llm: FakeHealthLLM) -> httpx.Response:
+    monkeypatch.setattr(app_module, "make_llm_client", lambda: llm)
+    with TestClient(app_module.app) as client:
+        return client.get("/health")
+
+
+def test_health_is_ok_when_ollama_replies_quickly(
+    startup: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    llm = FakeHealthLLM()
+
+    response = get_health(monkeypatch, llm)
+
+    assert (response.status_code, response.json()) == (200, {"status": "ok"})
+    assert llm.timeouts == [app_module.HEALTH_TIMEOUT_SECONDS]
+
+
+def test_health_is_unavailable_when_ollama_does_not_reply(
+    startup: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    llm = FakeHealthLLM(APIConnectionError(request=OLLAMA_REQUEST))
+
+    response = get_health(monkeypatch, llm)
+
+    assert response.status_code == 503
+    assert response.json() == {"status": "unavailable", "detail": "Ollama: Connection error."}
 
 
 def test_app_refuses_to_start_without_api_key(

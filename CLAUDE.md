@@ -19,7 +19,7 @@ src/football_agent/
   tools.py         # tool functions + their JSON schemas
   agent.py         # tool-calling loop
   llm.py           # LLM client config
-  app.py           # FastAPI app: chat page at /, agent at POST /ask
+  app.py           # FastAPI app: chat page at /, agent at POST /ask, health probe at /health
   static/          # chat page (HTML, CSS, JavaScript in one file)
   predictor/       # data download, features, training, registry, inference
     team_names.yaml  # football-data.org team ids -> CSV team names, updated each season
