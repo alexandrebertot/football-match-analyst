@@ -119,7 +119,7 @@ def test_evaluation_scores_each_answer_from_its_trace(
     scores = rows[[f"{column}/value" for column in columns]]
     assert scores.values.tolist() == [
         [True, True, 1.0, True, 1],
-        [False, False, 0.0, False, 0],
+        [False, False, 0.0, True, 0],
         [False, False, 0.0, False, 0],
         [False, False, 0.0, False, 1],
     ]

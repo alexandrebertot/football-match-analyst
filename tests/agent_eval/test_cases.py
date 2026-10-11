@@ -113,8 +113,12 @@ ANSWERS = {
     "What position are PSG in the Ligue 1 table, and how many points do they have?": (
         "PSG are third, on 3 pts."
     ),
-    "What was the score of PSG's last Ligue 1 match?": "PSG lost 0-2 at Lens.",
-    "What was the score of Lens's last Ligue 1 match?": "Lens beat Paris Saint-Germain FC 2 – 0.",
+    "What was the score of PSG's last Ligue 1 match, and who did they play?": (
+        "PSG lost 0-2 at Lens."
+    ),
+    "What was the score of Lens's last Ligue 1 match, and who did they play?": (
+        "Lens beat Paris Saint-Germain FC 2 – 0."
+    ),
     "Who do Lyon play next in the Ligue 1?": "Lyon host Lens on Sunday 18 October.",
     "Who do Nice play next in the Ligue 1?": "Nice travel to PSG.",
     "What were the Ligue 1 results on Sunday 4 October 2026?": "Lyon 1-3 Nice\nLens 2-0 PSG",
