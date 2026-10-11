@@ -99,6 +99,14 @@ def test_answer_returns_direct_reply_when_no_tool_is_needed(cache: sqlite3.Conne
     assert [message["role"] for message in request["messages"]] == ["system", "user"]
 
 
+def test_answer_asks_the_chosen_model(cache: sqlite3.Connection) -> None:
+    llm = FakeLLM([text_reply("Bonjour !")])
+
+    answer("Salut", llm, tool_context(cache), model="football-qwen-4b")
+
+    assert llm.requests[0]["model"] == "football-qwen-4b"
+
+
 def test_answer_runs_requested_tool_and_sends_result_back(cache: sqlite3.Connection) -> None:
     llm = FakeLLM(
         [

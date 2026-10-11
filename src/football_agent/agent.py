@@ -35,7 +35,7 @@ def run_tool_call(context: ToolContext, tool_call: ChatCompletionMessageToolCall
     return json.dumps(result, ensure_ascii=False)
 
 
-def answer(question: str, llm: OpenAI, context: ToolContext) -> str:
+def answer(question: str, llm: OpenAI, context: ToolContext, model: str = MODEL) -> str:
     """Answer `question`, letting the LLM call the football tools until it replies with text.
 
     When tracing is on, the question becomes a trace: one span for the whole answer and one per
@@ -49,7 +49,7 @@ def answer(question: str, llm: OpenAI, context: ToolContext) -> str:
         ]
         for _ in range(MAX_TOOL_ROUNDS):
             response = llm.chat.completions.create(
-                model=MODEL, messages=messages, tools=TOOL_SCHEMAS
+                model=model, messages=messages, tools=TOOL_SCHEMAS
             )
             choice = response.choices[0]
             if choice.finish_reason == "length":

@@ -29,6 +29,7 @@ configs/
   datasets/        # dataset configs: seasons, split, form window
   training/        # training configs: features, LightGBM hyperparameters, early stopping
 ollama/Modelfile   # football-qwen: base model and context size
+ollama/Modelfile.<size>  # smaller Qwen models, candidate students for the distillation
 Dockerfile, compose.yaml  # API image, run with docker compose
 tests/             # mirrors src/ (tests/predictor/ for the predictor)
 notebooks/         # exploration only, never imported by src/
@@ -38,6 +39,7 @@ notebooks/         # exploration only, never imported by src/
 
 - Install: `uv sync && uv run pre-commit install`
 - LLM (once, and after editing the Modelfile): `ollama create football-qwen -f ollama/Modelfile`
+  (candidate students: `ollama create football-qwen-<size> -f ollama/Modelfile.<size>`)
 - Lint and format: `uv run ruff check --fix . && uv run ruff format .`
 - Tests: `uv run pytest`
 - API (needs Ollama running and a `champion` model in `mlflow.db`; refreshes the current season
@@ -57,6 +59,7 @@ notebooks/         # exploration only, never imported by src/
   `data/snapshots/<date>.json`, about 2 minutes because of the API rate limit)
 - Agent evaluation (needs Ollama running, about 1 to 1.5 hours with 3 passes):
   `uv run python -m football_agent.agent_eval.run --snapshot data/snapshots/<date>.json --passes 3`
+  (add `--model football-qwen-<size>` to evaluate a candidate student instead of football-qwen)
   (asks every generated question once per pass, scores each answer from its trace, and records
   the run with its traces and the success rate with its 95% confidence interval)
 - MLflow UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db` (experiment `match-outcome`:
