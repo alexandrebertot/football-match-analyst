@@ -60,19 +60,23 @@ def test_fact_found_sees_a_word_through_markdown(answer: str) -> None:
     assert fact_found(Fact("leader", ("Lens",)), answer)
 
 
-# One of the shortest English answers of the first evaluation run, excerpts of its two answers
-# in Italian, and a French one.
+# Answers, or excerpts of answers, from the first evaluation runs, and a French one.
 @pytest.mark.parametrize(
     ("answer", "expected"),
     [
         (
-            "Freiburg's last Bundesliga match was against Frankfurt, which ended with a "
-            "**2-2 draw** on September 19, 2026.",
+            "Bologna's last Serie A match was a 1-1 draw against Torino, played on Saturday, "
+            "September 19th, 2026.",
             True,
         ),
-        ("Ecco i risultati del Ligue 1 di domenica 20 settembre 2026: Nice - Lille 2-1", False),
+        (
+            "Ecco i risultati della Champions League di giovedì 10 settembre 2026:\n\n"
+            "| Home Team | Away Team | Risultato |\n|---|---|---|\n| Fenerbahçe | Roma | 1-1 |",
+            False,
+        ),
         ("Basato sulle previsioni del modello, **Lille è nettamente favorito**: 58.5%", False),
         ("Lille est le favori du match contre Le Havre, avec 58,5 % de chances.", False),
+        ("2-1", False),
     ],
 )
 def test_answered_in_english_recognises_english_answers(answer: str, expected: bool) -> None:

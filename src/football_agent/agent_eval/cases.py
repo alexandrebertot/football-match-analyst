@@ -26,7 +26,7 @@ QUESTIONS = {
     "leader": "Who is top of the {name}?",
     "position": "What position are {team} in the {name} table, and how many points do they have?",
     "form_points": "How many points have {team} taken from their last {last_n} {name} matches?",
-    "last_result": "What was the score of {team}'s last {name} match?",
+    "last_result": "What was the score of {team}'s last {name} match, and who did they play?",
     "next_match": "Who do {team} play next in the {name}?",
     "day_results": "What were the {name} results on {day}?",
     "prediction": "Who is more likely to win, {home} or {away}, in their {name} match on {day}?",
