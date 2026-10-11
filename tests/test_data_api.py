@@ -110,6 +110,15 @@ def test_get_matches_sends_date_range(cache: sqlite3.Connection) -> None:
     assert requests[0].url.params["dateTo"] == "2026-10-07"
 
 
+def test_get_matches_sends_the_matchday_alone(cache: sqlite3.Connection) -> None:
+    requests: list[httpx.Request] = []
+    client = fake_client(cache, requests)
+
+    client.get_matches("PL", None, None, matchday=7)
+
+    assert dict(requests[0].url.params) == {"matchday": "7"}
+
+
 def test_get_team_matches_requests_last_finished_matches_of_competition(
     cache: sqlite3.Connection,
 ) -> None:

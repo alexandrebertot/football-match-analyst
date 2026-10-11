@@ -48,14 +48,23 @@ class SnapshotClient:
     def get_teams(self, competition: str) -> dict[str, Any]:
         return self._recorded(competition)["teams"]
 
-    def get_matches(self, competition: str, date_from: date, date_to: date) -> dict[str, Any]:
-        return {
-            "matches": [
+    def get_matches(
+        self,
+        competition: str,
+        date_from: date | None,
+        date_to: date | None,
+        matchday: int | None = None,
+    ) -> dict[str, Any]:
+        matches = self._season_matches(competition)
+        if date_from is not None and date_to is not None:
+            matches = [
                 match
-                for match in self._season_matches(competition)
+                for match in matches
                 if date_from <= date.fromisoformat(match["utcDate"][:10]) <= date_to
             ]
-        }
+        if matchday is not None:
+            matches = [match for match in matches if match["matchday"] == matchday]
+        return {"matches": matches}
 
     def get_team_matches(self, team_id: int, competition: str, limit: int) -> dict[str, Any]:
         finished = sorted(

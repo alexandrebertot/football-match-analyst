@@ -11,21 +11,24 @@ from football_agent.tools import COMPETITIONS
 PSG, LYON, NICE = 524, 523, 522
 
 
-def match(day: str, home: int, away: int, status: str = "FINISHED") -> dict[str, Any]:
+def match(
+    day: str, home: int, away: int, status: str = "FINISHED", matchday: int = 1
+) -> dict[str, Any]:
     return {
         "utcDate": f"{day}T19:00:00Z",
         "status": status,
+        "matchday": matchday,
         "homeTeam": {"id": home},
         "awayTeam": {"id": away},
     }
 
 
 SEASON_MATCHES = [
-    match("2026-08-16", PSG, LYON),
-    match("2026-08-23", NICE, PSG),
-    match("2026-08-30", LYON, NICE),
-    match("2026-09-13", PSG, NICE),
-    match("2026-10-17", LYON, PSG, status="TIMED"),
+    match("2026-08-16", PSG, LYON, matchday=1),
+    match("2026-08-23", NICE, PSG, matchday=2),
+    match("2026-08-30", LYON, NICE, matchday=3),
+    match("2026-09-13", PSG, NICE, matchday=4),
+    match("2026-10-17", LYON, PSG, status="TIMED", matchday=5),
 ]
 SNAPSHOT = {
     "date": "2026-10-09",
@@ -53,6 +56,12 @@ def test_get_matches_keeps_the_matches_between_both_dates_included(client: Snaps
     raw = client.get_matches("FL1", date(2026, 8, 23), date(2026, 9, 13))
 
     assert sorted(dates(raw)) == ["2026-08-23", "2026-08-30", "2026-09-13"]
+
+
+def test_get_matches_keeps_the_matches_of_a_matchday(client: SnapshotClient) -> None:
+    raw = client.get_matches("FL1", None, None, matchday=3)
+
+    assert dates(raw) == ["2026-08-30"]
 
 
 def test_get_team_matches_gives_the_last_finished_matches_oldest_first(
