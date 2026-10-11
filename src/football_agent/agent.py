@@ -35,8 +35,16 @@ def run_tool_call(context: ToolContext, tool_call: ChatCompletionMessageToolCall
     return json.dumps(result, ensure_ascii=False)
 
 
-def answer(question: str, llm: OpenAI, context: ToolContext, model: str = MODEL) -> str:
+def answer(
+    question: str,
+    llm: OpenAI,
+    context: ToolContext,
+    model: str = MODEL,
+    thinking: bool = True,
+) -> str:
     """Answer `question`, letting the LLM call the football tools until it replies with text.
+
+    With `thinking` off, the LLM answers without writing its reasoning first.
 
     When tracing is on, the question becomes a trace: one span for the whole answer and one per
     tool call, while MLflow's openai autolog adds a span for each LLM call.
@@ -47,9 +55,11 @@ def answer(question: str, llm: OpenAI, context: ToolContext, model: str = MODEL)
             {"role": "system", "content": build_system_prompt(context.today)},
             {"role": "user", "content": question},
         ]
+        # How Ollama turns thinking off through its OpenAI-compatible API.
+        options = {} if thinking else {"reasoning_effort": "none"}
         for _ in range(MAX_TOOL_ROUNDS):
             response = llm.chat.completions.create(
-                model=model, messages=messages, tools=TOOL_SCHEMAS
+                model=model, messages=messages, tools=TOOL_SCHEMAS, **options
             )
             choice = response.choices[0]
             if choice.finish_reason == "length":

@@ -60,7 +60,8 @@ notebooks/         # exploration only, never imported by src/
 - Agent evaluation (needs Ollama running, about 1 to 1.5 hours with 3 passes):
   `uv run python -m football_agent.agent_eval.run --snapshot data/snapshots/<date>.json --passes 3`
   (add `--model football-qwen-<size>` to evaluate a candidate student instead of football-qwen,
-  and `--note "<why this run>"` to give the run a description in MLflow)
+  `--note "<why this run>"` to give the run a description in MLflow, and `--no-thinking` to let
+  the model answer without writing its reasoning first)
   (asks every generated question once per pass, scores each answer from its trace, and records
   the run with its traces and the success rate with its 95% confidence interval)
 - MLflow UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db` (experiment `match-outcome`:
