@@ -206,6 +206,10 @@ def predict_match(
     competition: str,
     match_date: str | None = None,
 ) -> dict[str, Any]:
+    # The model only learned from these leagues: elsewhere its estimates mean nothing.
+    if competition not in LEAGUE_FILES:
+        leagues = ", ".join(LEAGUE_FILES)
+        raise ValueError(f"Predictions only cover the leagues the model was trained on: {leagues}.")
     teams = context.football.get_teams(competition)["teams"]
     home, away = find_team(teams, home_team), find_team(teams, away_team)
     if home["id"] == away["id"]:

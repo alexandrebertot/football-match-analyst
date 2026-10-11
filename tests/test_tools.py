@@ -478,6 +478,19 @@ def test_predict_match_defaults_to_the_context_date(
     assert fake_predictor.requests[0][2] == TODAY
 
 
+def test_predict_match_refuses_a_competition_the_model_was_not_trained_on(
+    cache: sqlite3.Connection, fake_predictor: Any
+) -> None:
+    requests: list[httpx.Request] = []
+    context = tool_context(cache, {}, requests, fake_predictor)
+
+    with pytest.raises(ValueError, match="only cover the leagues the model was trained on: PL"):
+        predict_match(context, "Bayern", "PSG", "CL", "2026-10-21")
+
+    assert requests == []
+    assert fake_predictor.requests == []
+
+
 def test_predict_match_refuses_a_team_playing_itself(
     cache: sqlite3.Connection, fake_predictor: Any
 ) -> None:
