@@ -123,6 +123,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate the agent on a recorded snapshot.")
     parser.add_argument("--snapshot", type=Path, required=True)
     parser.add_argument("--passes", type=int, default=3)
+    parser.add_argument("--model", default=MODEL, help="Ollama model that runs the agent.")
     args = parser.parse_args()
 
     # Ollama answers one question at a time on a single GPU; and without the second setting,
@@ -141,15 +142,17 @@ if __name__ == "__main__":
     facts = [expected_facts(case, context) for case in cases]
     llm = make_llm_client()
     # MLflow records an answer that raised as a failure and goes on: without this check, an
-    # Ollama that is not running would give a success rate of 0%.
-    llm.models.list()
+    # Ollama that is not running, or a model it does not have, would give a success rate of 0%.
+    available = {model.id.removesuffix(":latest") for model in llm.models.list()}
+    if args.model not in available:
+        parser.error(f"Ollama has no model '{args.model}': create it first, see ollama/.")
 
     mlflow.set_experiment(EVALUATION_EXPERIMENT)
     mlflow.openai.autolog()
-    with mlflow.start_run():
+    with mlflow.start_run(run_name=f"{args.model} x{args.passes}"):
         mlflow.log_params(
             {
-                "model": MODEL,
+                "model": args.model,
                 "snapshot": snapshot["date"],
                 "questions": len(cases),
                 "passes": args.passes,
@@ -157,7 +160,7 @@ if __name__ == "__main__":
         )
         result = mlflow.genai.evaluate(
             data=evaluation_data(cases, facts, args.passes),
-            predict_fn=lambda question: answer(question, llm, context),
+            predict_fn=lambda question: answer(question, llm, context, args.model),
             scorers=[answer_score],
         )
         rate, margin = success_interval(result.result_df)
