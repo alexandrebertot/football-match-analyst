@@ -27,7 +27,7 @@ Z_95 = 1.96
 
 
 def evaluation_data(
-    cases: list[EvalCase], facts: list[list[Fact]], passes: int
+    cases: list[EvalCase], facts: list[list[Fact]], passes: int, model: str
 ) -> list[dict[str, Any]]:
     """One row per question and pass, in the format of mlflow.genai.evaluate."""
     return [
@@ -41,7 +41,12 @@ def evaluation_data(
                     for fact in case_facts
                 ],
             },
-            "tags": {"kind": case.kind, "competition": case.competition, "pass": str(number)},
+            "tags": {
+                "model": model,
+                "kind": case.kind,
+                "competition": case.competition,
+                "pass": str(number),
+            },
         }
         for number in range(passes)
         for case, case_facts in zip(cases, facts, strict=True)
@@ -124,6 +129,7 @@ if __name__ == "__main__":
     parser.add_argument("--snapshot", type=Path, required=True)
     parser.add_argument("--passes", type=int, default=3)
     parser.add_argument("--model", default=MODEL, help="Ollama model that runs the agent.")
+    parser.add_argument("--note", default="", help="Why this run: shown as its description.")
     args = parser.parse_args()
 
     # Ollama answers one question at a time on a single GPU; and without the second setting,
@@ -149,7 +155,10 @@ if __name__ == "__main__":
 
     mlflow.set_experiment(EVALUATION_EXPERIMENT)
     mlflow.openai.autolog()
-    with mlflow.start_run(run_name=f"{args.model} x{args.passes}"):
+    # MLflow shows the mlflow.note.content tag as the description of the run.
+    with mlflow.start_run(
+        run_name=f"{args.model} x{args.passes}", tags={"mlflow.note.content": args.note}
+    ):
         mlflow.log_params(
             {
                 "model": args.model,
@@ -159,7 +168,7 @@ if __name__ == "__main__":
             }
         )
         result = mlflow.genai.evaluate(
-            data=evaluation_data(cases, facts, args.passes),
+            data=evaluation_data(cases, facts, args.passes, args.model),
             predict_fn=lambda question: answer(question, llm, context, args.model),
             scorers=[answer_score],
         )

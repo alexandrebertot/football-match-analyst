@@ -63,7 +63,7 @@ def test_evaluation_data_asks_every_question_once_per_pass() -> None:
     position = EvalCase("position", "Where are Lens?", "FL1", {"competition": "FL1"}, "Lens")
     facts = [LEADER_FACTS, [Fact("position 2", ("2nd", "second"))]]
 
-    rows = evaluation_data([LEADER, position], facts, passes=2)
+    rows = evaluation_data([LEADER, position], facts, passes=2, model="football-qwen-2b")
 
     assert [(row["inputs"]["question"], row["tags"]["pass"]) for row in rows] == [
         ("Who is top of the Ligue 1?", "0"),
@@ -76,7 +76,12 @@ def test_evaluation_data_asks_every_question_once_per_pass() -> None:
         "competition": "FL1",
         "facts": [{"description": "position 2", "spellings": ["2nd", "second"]}],
     }
-    assert rows[1]["tags"] == {"kind": "position", "competition": "FL1", "pass": "0"}
+    assert rows[1]["tags"] == {
+        "model": "football-qwen-2b",
+        "kind": "position",
+        "competition": "FL1",
+        "pass": "0",
+    }
 
 
 def test_evaluation_scores_each_answer_from_its_trace(
@@ -104,7 +109,7 @@ def test_evaluation_scores_each_answer_from_its_trace(
     context = ToolContext(SnapshotClient(SNAPSHOT), None, date(2026, 10, 9))
 
     result = mlflow.genai.evaluate(
-        data=evaluation_data([LEADER], [LEADER_FACTS], passes=4),
+        data=evaluation_data([LEADER], [LEADER_FACTS], passes=4, model="football-qwen"),
         predict_fn=lambda question: answer(question, llm, context),
         scorers=[answer_score],
     )
