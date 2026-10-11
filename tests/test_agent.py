@@ -99,6 +99,17 @@ def test_answer_returns_direct_reply_when_no_tool_is_needed(cache: sqlite3.Conne
     assert [message["role"] for message in request["messages"]] == ["system", "user"]
 
 
+@pytest.mark.parametrize(("thinking", "reasoning_effort"), [(True, None), (False, "none")])
+def test_answer_turns_thinking_off_only_when_asked(
+    cache: sqlite3.Connection, thinking: bool, reasoning_effort: str | None
+) -> None:
+    llm = FakeLLM([text_reply("Bonjour !")])
+
+    answer("Salut", llm, tool_context(cache), thinking=thinking)
+
+    assert llm.requests[0].get("reasoning_effort") == reasoning_effort
+
+
 def test_answer_asks_the_chosen_model(cache: sqlite3.Connection) -> None:
     llm = FakeLLM([text_reply("Bonjour !")])
 

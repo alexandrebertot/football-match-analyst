@@ -130,6 +130,9 @@ if __name__ == "__main__":
     parser.add_argument("--passes", type=int, default=3)
     parser.add_argument("--model", default=MODEL, help="Ollama model that runs the agent.")
     parser.add_argument("--note", default="", help="Why this run: shown as its description.")
+    parser.add_argument(
+        "--no-thinking", action="store_true", help="Answer without writing a reasoning first."
+    )
     args = parser.parse_args()
 
     # Ollama answers one question at a time on a single GPU; and without the second setting,
@@ -155,13 +158,14 @@ if __name__ == "__main__":
 
     mlflow.set_experiment(EVALUATION_EXPERIMENT)
     mlflow.openai.autolog()
+    thinking = not args.no_thinking
+    run_name = f"{args.model} x{args.passes}" + ("" if thinking else " no-thinking")
     # MLflow shows the mlflow.note.content tag as the description of the run.
-    with mlflow.start_run(
-        run_name=f"{args.model} x{args.passes}", tags={"mlflow.note.content": args.note}
-    ):
+    with mlflow.start_run(run_name=run_name, tags={"mlflow.note.content": args.note}):
         mlflow.log_params(
             {
                 "model": args.model,
+                "thinking": thinking,
                 "snapshot": snapshot["date"],
                 "questions": len(cases),
                 "passes": args.passes,
@@ -169,7 +173,7 @@ if __name__ == "__main__":
         )
         result = mlflow.genai.evaluate(
             data=evaluation_data(cases, facts, args.passes, args.model),
-            predict_fn=lambda question: answer(question, llm, context, args.model),
+            predict_fn=lambda question: answer(question, llm, context, args.model, thinking),
             scorers=[answer_score],
         )
         rate, margin = success_interval(result.result_df)
