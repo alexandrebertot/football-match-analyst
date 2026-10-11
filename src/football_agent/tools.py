@@ -171,8 +171,6 @@ def get_matches(
 ) -> list[dict[str, Any]]:
     if (date_from is None) != (date_to is None):
         raise ValueError("Give both date_from and date_to, or neither.")
-    if date_from is None and matchday is None:
-        raise ValueError("Give a period (date_from and date_to), a matchday, or both.")
     first_day = date.fromisoformat(date_from) if date_from else None
     last_day = date.fromisoformat(date_to) if date_to else None
     matches = context.football.get_matches(competition, first_day, last_day, matchday)["matches"]
@@ -186,7 +184,7 @@ def get_matches(
     if len(matches) > MAX_MATCHES:
         raise ValueError(
             f"This request matches {len(matches)} matches, but a result holds at most "
-            f"{MAX_MATCHES}: give a team_name, or ask for a shorter period."
+            f"{MAX_MATCHES}: give a team_name, a matchday, or a shorter period."
         )
     return [summarize_match(match) for match in matches]
 
@@ -272,10 +270,10 @@ TOOL_SCHEMAS = [
             "name": "get_matches",
             "description": (
                 "Get the matches of a competition over a period (both days included), a "
-                "matchday, or both: date, weekday and matchday, final and half-time scores of "
-                f"finished matches, status of upcoming ones. A result holds at most {MAX_MATCHES} "
-                "matches: give a team to get only its matches, for example all its remaining "
-                "matches of the season."
+                "matchday, or the whole season: date, weekday and matchday, final and half-time "
+                "scores of finished matches, status of upcoming ones. A result holds at most "
+                f"{MAX_MATCHES} matches: give a team to get only its matches, for example its "
+                "whole season."
             ),
             "parameters": {
                 "type": "object",
