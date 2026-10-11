@@ -81,6 +81,7 @@ def test_evaluation_data_asks_every_question_once_per_pass() -> None:
         "model": "football-qwen-2b",
         "kind": "position",
         "competition": "FL1",
+        "language": "en",
         "pass": "0",
     }
 

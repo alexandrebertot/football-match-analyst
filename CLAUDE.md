@@ -57,7 +57,8 @@ notebooks/         # exploration only, never imported by src/
 - Evaluation snapshot: `uv run --env-file .env python -m football_agent.agent_eval.snapshot`
   (records the standings, teams and season matches of every competition into
   `data/snapshots/<date>.json`, about 2 minutes because of the API rate limit)
-- Agent evaluation (needs Ollama running, about 1 to 1.5 hours with 3 passes):
+- Agent evaluation (needs Ollama running; with 3 passes, about 1 hour for the 2B model and 2 hours
+  for the 9B):
   `uv run python -m football_agent.agent_eval.run --snapshot data/snapshots/<date>.json --passes 3`
   (add `--model football-qwen-<size>` to evaluate a candidate student instead of football-qwen,
   `--note "<why this run>"` to give the run a description in MLflow, and `--no-thinking` to let

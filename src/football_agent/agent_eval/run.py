@@ -46,6 +46,7 @@ def evaluation_data(
                 "model": model,
                 "kind": case.kind,
                 "competition": case.competition,
+                "language": case.language,
                 "pass": str(number),
             },
         }
