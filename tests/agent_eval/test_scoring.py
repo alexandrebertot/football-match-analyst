@@ -1,9 +1,11 @@
+from typing import Any
+
 import pytest
 
 from football_agent.agent_eval.scoring import (
     Fact,
     ToolCall,
-    answered_in_english,
+    answered_in,
     called_expected_tool,
     fact_found,
     normalize_text,
@@ -60,27 +62,33 @@ def test_fact_found_sees_a_word_through_markdown(answer: str) -> None:
     assert fact_found(Fact("leader", ("Lens",)), answer)
 
 
+BOLOGNA = (
+    "Bologna's last Serie A match was a 1-1 draw against Torino, played on Saturday, "
+    "September 19th, 2026."
+)
+CHAMPIONS_LEAGUE_IN_ITALIAN = (
+    "Ecco i risultati della Champions League di giovedì 10 settembre 2026:\n\n"
+    "| Home Team | Away Team | Risultato |\n|---|---|---|\n| Fenerbahçe | Roma | 1-1 |"
+)
+LILLE_IN_FRENCH = "Lille est le favori du match contre Le Havre, avec 58,5 % de chances."
+
+
 # Answers, or excerpts of answers, from the first evaluation runs, and a French one.
 @pytest.mark.parametrize(
-    ("answer", "expected"),
+    ("answer", "language", "expected"),
     [
-        (
-            "Bologna's last Serie A match was a 1-1 draw against Torino, played on Saturday, "
-            "September 19th, 2026.",
-            True,
-        ),
-        (
-            "Ecco i risultati della Champions League di giovedì 10 settembre 2026:\n\n"
-            "| Home Team | Away Team | Risultato |\n|---|---|---|\n| Fenerbahçe | Roma | 1-1 |",
-            False,
-        ),
-        ("Basato sulle previsioni del modello, **Lille è nettamente favorito**: 58.5%", False),
-        ("Lille est le favori du match contre Le Havre, avec 58,5 % de chances.", False),
-        ("2-1", False),
+        (BOLOGNA, "en", True),
+        (CHAMPIONS_LEAGUE_IN_ITALIAN, "en", False),
+        (CHAMPIONS_LEAGUE_IN_ITALIAN, "fr", False),
+        (LILLE_IN_FRENCH, "fr", True),
+        (LILLE_IN_FRENCH, "en", False),
+        ("2-1", "en", False),
     ],
 )
-def test_answered_in_english_recognises_english_answers(answer: str, expected: bool) -> None:
-    assert answered_in_english(answer) is expected
+def test_answered_in_recognises_the_language_of_the_answer(
+    answer: str, language: str, expected: bool
+) -> None:
+    assert answered_in(answer, language) is expected
 
 
 def test_called_expected_tool_accepts_any_listed_tool_on_the_right_competition() -> None:
@@ -98,13 +106,12 @@ def test_score_case_succeeds_only_with_the_right_tool_and_every_fact() -> None:
     ]
     facts = [Fact("leader", ("Monaco",)), Fact("points", ("13",))]
 
-    complete = score_case(
-        "Monaco are top of the table with 13 points.", calls, ("get_standings",), "FL1", facts
-    )
-    partial = score_case("Monaco are top of the table.", calls, ("get_standings",), "FL1", facts)
-    italian = score_case(
-        "Il Monaco è primo in classifica con 13 points.", calls, ("get_standings",), "FL1", facts
-    )
+    def score(answer: str) -> dict[str, Any]:
+        return score_case(answer, calls, ("get_standings",), "FL1", facts, "en")
+
+    complete = score("Monaco are top of the table with 13 points.")
+    partial = score("Monaco are top of the table.")
+    italian = score("Il Monaco è primo in classifica con 13 points.")
 
     assert complete == {
         "right_tool": True,

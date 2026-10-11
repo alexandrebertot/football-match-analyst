@@ -74,6 +74,7 @@ def test_evaluation_data_asks_every_question_once_per_pass() -> None:
     assert rows[1]["expectations"] == {
         "tools": ["get_standings"],
         "competition": "FL1",
+        "language": "en",
         "facts": [{"description": "position 2", "spellings": ["2nd", "second"]}],
     }
     assert rows[1]["tags"] == {

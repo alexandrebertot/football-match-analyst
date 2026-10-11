@@ -60,6 +60,7 @@ class EvalCase:
     competition: str
     reference_arguments: dict[str, Any]
     team: str | None = None
+    language: str = "en"
 
 
 def make_case(
