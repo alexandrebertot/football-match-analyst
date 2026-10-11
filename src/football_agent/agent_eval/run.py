@@ -85,14 +85,21 @@ def answer_score(outputs: str | None, expectations: dict[str, Any], trace: Trace
         facts,
     )
     missing = [fact.description for fact in facts if not fact_found(fact, text)]
+    if outputs is None:
+        facts_rationale = "No answer: the agent raised an error, see the trace."
+    elif missing:
+        facts_rationale = f"Missing: {', '.join(missing)}"
+    else:
+        facts_rationale = "Every fact found."
     return [
         Feedback(name="success", value=score["success"]),
         Feedback(name="right_tool", value=score["right_tool"]),
         Feedback(
             name="facts_found",
             value=score["facts_found"] / score["facts_expected"],
-            rationale=f"Missing: {', '.join(missing)}" if missing else "Every fact found.",
+            rationale=facts_rationale,
         ),
+        Feedback(name="right_language", value=score["right_language"]),
         Feedback(name="failed_calls", value=score["failed_calls"]),
     ]
 

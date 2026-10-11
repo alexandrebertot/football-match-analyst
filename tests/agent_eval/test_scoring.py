@@ -3,6 +3,7 @@ import pytest
 from football_agent.agent_eval.scoring import (
     Fact,
     ToolCall,
+    answered_in_english,
     called_expected_tool,
     fact_found,
     normalize_text,
@@ -59,6 +60,25 @@ def test_fact_found_sees_a_word_through_markdown(answer: str) -> None:
     assert fact_found(Fact("leader", ("Lens",)), answer)
 
 
+# One of the shortest English answers of the first evaluation run, excerpts of its two answers
+# in Italian, and a French one.
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        (
+            "Freiburg's last Bundesliga match was against Frankfurt, which ended with a "
+            "**2-2 draw** on September 19, 2026.",
+            True,
+        ),
+        ("Ecco i risultati del Ligue 1 di domenica 20 settembre 2026: Nice - Lille 2-1", False),
+        ("Basato sulle previsioni del modello, **Lille è nettamente favorito**: 58.5%", False),
+        ("Lille est le favori du match contre Le Havre, avec 58,5 % de chances.", False),
+    ],
+)
+def test_answered_in_english_recognises_english_answers(answer: str, expected: bool) -> None:
+    assert answered_in_english(answer) is expected
+
+
 def test_called_expected_tool_accepts_any_listed_tool_on_the_right_competition() -> None:
     calls = [ToolCall("get_matches", {"competition": "PL"}, "{}")]
 
@@ -74,14 +94,25 @@ def test_score_case_succeeds_only_with_the_right_tool_and_every_fact() -> None:
     ]
     facts = [Fact("leader", ("Monaco",)), Fact("points", ("13",))]
 
-    complete = score_case("Monaco lead with 13 points.", calls, ("get_standings",), "FL1", facts)
-    partial = score_case("Monaco lead the table.", calls, ("get_standings",), "FL1", facts)
+    complete = score_case(
+        "Monaco are top of the table with 13 points.", calls, ("get_standings",), "FL1", facts
+    )
+    partial = score_case("Monaco are top of the table.", calls, ("get_standings",), "FL1", facts)
+    italian = score_case(
+        "Il Monaco è primo in classifica con 13 points.", calls, ("get_standings",), "FL1", facts
+    )
 
     assert complete == {
         "right_tool": True,
         "facts_found": 2,
         "facts_expected": 2,
+        "right_language": True,
         "failed_calls": 1,
         "success": True,
     }
     assert (partial["facts_found"], partial["success"]) == (1, False)
+    assert (italian["facts_found"], italian["right_language"], italian["success"]) == (
+        2,
+        False,
+        False,
+    )
