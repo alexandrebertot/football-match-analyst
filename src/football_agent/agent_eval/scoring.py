@@ -6,6 +6,16 @@ from football_agent.tools import normalize_name
 
 # LLMs often write typographic dashes and apostrophes where the tools return plain ones.
 PLAIN_CHARACTERS = str.maketrans({"–": "-", "—": "-", "−": "-", "’": "'", "‘": "'"})
+# Words that exist in English but not in French, Italian, Spanish or German. On the first
+# evaluation run, answers in English used at least 3 of them and answers in Italian none.
+ENGLISH_WORDS = frozenset(
+    {
+        "the", "is", "are", "were", "of", "and", "with", "their", "they", "has", "have", "from",
+        "for", "this", "which", "by", "at", "it", "its", "be", "been", "there", "after",
+        "against", "currently", "won", "lost", "away",
+    }
+)  # fmt: skip
+MIN_ENGLISH_WORDS = 2
 
 
 @dataclass(frozen=True)
@@ -46,6 +56,13 @@ def fact_found(fact: Fact, answer: str) -> bool:
     )
 
 
+def answered_in_english(answer: str) -> bool:
+    """Whether the answer uses enough English-only words to be written in English, as the
+    questions are."""
+    words = set(re.findall(r"[a-z]+", answer.lower()))
+    return len(words & ENGLISH_WORDS) >= MIN_ENGLISH_WORDS
+
+
 def called_expected_tool(calls: list[ToolCall], tools: tuple[str, ...], competition: str) -> bool:
     """Whether one of the tools that can answer the question was called on the right competition."""
     return any(
@@ -60,16 +77,19 @@ def score_case(
     competition: str,
     facts: list[Fact],
 ) -> dict[str, Any]:
-    """Score one answer: right tool, facts stated, and tool calls that failed along the way.
+    """Score one answer: right tool, facts stated, language, and tool calls that failed along
+    the way.
 
     A failed call that the agent then fixed does not make the answer fail.
     """
     found = sum(fact_found(fact, answer) for fact in facts)
     right_tool = called_expected_tool(calls, tools, competition)
+    right_language = answered_in_english(answer)
     return {
         "right_tool": right_tool,
         "facts_found": found,
         "facts_expected": len(facts),
+        "right_language": right_language,
         "failed_calls": sum(call.result.startswith("Error:") for call in calls),
-        "success": right_tool and found == len(facts),
+        "success": right_tool and found == len(facts) and right_language,
     }

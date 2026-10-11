@@ -110,16 +110,21 @@ def test_evaluation_scores_each_answer_from_its_trace(
     )
 
     rows = result.result_df.sort_values("request_time")
-    scores = rows[["success/value", "right_tool/value", "facts_found/value", "failed_calls/value"]]
+    columns = ["success", "right_tool", "facts_found", "right_language", "failed_calls"]
+    scores = rows[[f"{column}/value" for column in columns]]
     assert scores.values.tolist() == [
-        [True, True, 1.0, 1],
-        [False, False, 0.0, 0],
-        [False, False, 0.0, 0],
-        [False, False, 0.0, 1],
+        [True, True, 1.0, True, 1],
+        [False, False, 0.0, False, 0],
+        [False, False, 0.0, False, 0],
+        [False, False, 0.0, False, 1],
     ]
     assert rows["state"].tolist() == ["OK", "OK", "ERROR", "ERROR"]
     wrong_answer = {note["assessment_name"]: note for note in rows["assessments"].iloc[1]}
     assert wrong_answer["facts_found"]["rationale"] == "Missing: leader"
+    no_answer = {note["assessment_name"]: note for note in rows["assessments"].iloc[2]}
+    assert no_answer["facts_found"]["rationale"] == (
+        "No answer: the agent raised an error, see the trace."
+    )
 
 
 def test_success_interval_counts_questions_not_answers() -> None:
