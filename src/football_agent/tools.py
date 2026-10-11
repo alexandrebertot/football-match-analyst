@@ -62,10 +62,6 @@ def summarize_match(match: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def summarize_matches(raw: dict[str, Any]) -> list[dict[str, Any]]:
-    return [summarize_match(match) for match in raw["matches"]]
-
-
 def normalize_name(name: str) -> str:
     """Lowercase and strip accents and surrounding spaces, so that ' Étienne' equals 'etienne'."""
     decomposed = unicodedata.normalize("NFKD", name)
@@ -99,6 +95,9 @@ def find_team(teams: list[dict[str, Any]], name: str) -> dict[str, Any]:
 
 
 DEFAULT_FORM_MATCHES = 5
+# A whole season of a competition would fill the LLM context and leave it no room to answer;
+# 40 matches still fit, and cover the whole season of one team in any league.
+MAX_MATCHES = 40
 RESULT_POINTS = {"W": 3, "D": 1, "L": 0}
 
 
@@ -157,17 +156,36 @@ def get_standings(
 
 
 def get_matches(
-    context: ToolContext, competition: str, date_from: str, date_to: str
+    context: ToolContext,
+    competition: str,
+    date_from: str,
+    date_to: str,
+    team_name: str | None = None,
 ) -> list[dict[str, Any]]:
     raw = context.football.get_matches(
         competition, date.fromisoformat(date_from), date.fromisoformat(date_to)
     )
-    return summarize_matches(raw)
+    matches = raw["matches"]
+    if team_name is not None:
+        team = find_team(context.football.get_teams(competition)["teams"], team_name)
+        matches = [
+            match
+            for match in matches
+            if team["id"] in (match["homeTeam"]["id"], match["awayTeam"]["id"])
+        ]
+    if len(matches) > MAX_MATCHES:
+        raise ValueError(
+            f"This request matches {len(matches)} matches, but a result holds at most "
+            f"{MAX_MATCHES}: give a team_name, or ask for a shorter period."
+        )
+    return [summarize_match(match) for match in matches]
 
 
 def get_team_form(
     context: ToolContext, team_name: str, competition: str, last_n: int = DEFAULT_FORM_MATCHES
 ) -> dict[str, Any]:
+    if last_n > MAX_MATCHES:
+        raise ValueError(f"last_n is at most {MAX_MATCHES}.")
     team = find_team(context.football.get_teams(competition)["teams"], team_name)
     raw = context.football.get_team_matches(team["id"], competition, limit=last_n)
     return summarize_team_form(raw, team)
@@ -243,8 +261,10 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "get_matches",
             "description": (
-                "Get the matches of a competition between two dates, both included: date and "
-                "weekday, final and half-time scores of finished matches, status of upcoming ones."
+                "Get the matches of a competition between two dates, both included: date, "
+                "weekday and matchday, final and half-time scores of finished matches, status of "
+                f"upcoming ones. A result holds at most {MAX_MATCHES} matches: give a team to get "
+                "only its matches, for example all its remaining matches of the season."
             ),
             "parameters": {
                 "type": "object",
@@ -252,6 +272,13 @@ TOOL_SCHEMAS = [
                     "competition": COMPETITION_PARAMETER,
                     "date_from": {"type": "string", "description": "First day, YYYY-MM-DD."},
                     "date_to": {"type": "string", "description": "Last day, YYYY-MM-DD."},
+                    "team_name": {
+                        "type": "string",
+                        "description": (
+                            "Optional team name, e.g. 'PSG': only the matches of this team. "
+                            "Omit it for every match of the competition."
+                        ),
+                    },
                 },
                 "required": ["competition", "date_from", "date_to"],
             },
@@ -280,8 +307,8 @@ TOOL_SCHEMAS = [
                     "last_n": {
                         "type": "integer",
                         "description": (
-                            "Number of last finished matches to return. "
-                            f"Defaults to {DEFAULT_FORM_MATCHES}."
+                            "Number of last finished matches to return, at most "
+                            f"{MAX_MATCHES}. Defaults to {DEFAULT_FORM_MATCHES}."
                         ),
                     },
                 },
