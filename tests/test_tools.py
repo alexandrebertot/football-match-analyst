@@ -22,7 +22,6 @@ from football_agent.tools import (
     predict_match,
     season_label,
     summarize_match,
-    summarize_matches,
     summarize_standings,
     summarize_team_form,
 )
@@ -165,22 +164,6 @@ def test_summarize_match_of_unplayed_match_has_no_score() -> None:
     assert summary["status"] == "TIMED"
 
 
-def test_summarize_matches_summarizes_every_match() -> None:
-    raw = {
-        "matches": [
-            make_match("Paris FC", "Strasbourg", {"home": 2, "away": 1}, "FINISHED"),
-            make_match("PSG", "Monaco", {"home": None, "away": None}, "TIMED"),
-        ]
-    }
-
-    summaries = summarize_matches(raw)
-
-    assert [(s["home"], s["away"]) for s in summaries] == [
-        ("Paris FC", "Strasbourg"),
-        ("PSG", "Monaco"),
-    ]
-
-
 def test_normalize_name_ignores_case_accents_and_surrounding_spaces() -> None:
     assert normalize_name("  Saint-Étienne ") == "saint-etienne"
 
@@ -307,6 +290,66 @@ def test_get_matches_tool_rejects_malformed_date_before_calling_api(
 
     with pytest.raises(ValueError):
         get_matches(context, "FL1", "19 septembre", "2026-09-20")
+
+    assert requests == []
+
+
+def test_get_matches_tool_keeps_only_the_matches_of_the_given_team(
+    cache: sqlite3.Connection,
+) -> None:
+    requests: list[httpx.Request] = []
+    paris_fc = make_match("Paris FC", "Strasbourg", {"home": 2, "away": 1}, "FINISHED")
+    lyon_psg = make_match("Olympique Lyon", "PSG", {"home": None, "away": None}, "TIMED")
+    lyon_psg["homeTeam"]["id"], lyon_psg["awayTeam"]["id"] = 523, 524
+    responses = {
+        "/v4/competitions/FL1/matches": {"matches": [paris_fc, lyon_psg]},
+        "/v4/competitions/FL1/teams": {"teams": TEAMS},
+    }
+    context = tool_context(cache, responses, requests)
+
+    matches = get_matches(context, "FL1", "2026-09-19", "2026-09-20", team_name="PSG")
+
+    assert matches == [summarize_match(lyon_psg)]
+
+
+@pytest.mark.parametrize(("count", "allowed"), [(40, True), (41, False)])
+def test_get_matches_tool_returns_at_most_40_matches(
+    cache: sqlite3.Connection, count: int, allowed: bool
+) -> None:
+    match = make_match("Paris FC", "Strasbourg", {"home": None, "away": None}, "TIMED")
+    responses = {"/v4/competitions/FL1/matches": {"matches": [match] * count}}
+    context = tool_context(cache, responses, [])
+
+    if allowed:
+        assert len(get_matches(context, "FL1", "2026-10-09", "2027-05-29")) == count
+    else:
+        with pytest.raises(ValueError, match="matches 41 matches, but a result holds at most 40"):
+            get_matches(context, "FL1", "2026-10-09", "2027-05-29")
+
+
+def test_get_matches_tool_counts_the_matches_after_the_team_filter(
+    cache: sqlite3.Connection,
+) -> None:
+    paris_fc = make_match("Paris FC", "Strasbourg", {"home": None, "away": None}, "TIMED")
+    lyon_psg = make_match("Olympique Lyon", "PSG", {"home": None, "away": None}, "TIMED")
+    lyon_psg["homeTeam"]["id"], lyon_psg["awayTeam"]["id"] = 523, 524
+    responses = {
+        "/v4/competitions/FL1/matches": {"matches": [paris_fc] * 41 + [lyon_psg]},
+        "/v4/competitions/FL1/teams": {"teams": TEAMS},
+    }
+    context = tool_context(cache, responses, [])
+
+    matches = get_matches(context, "FL1", "2026-10-09", "2027-05-29", team_name="PSG")
+
+    assert matches == [summarize_match(lyon_psg)]
+
+
+def test_get_team_form_tool_refuses_more_than_40_matches(cache: sqlite3.Connection) -> None:
+    requests: list[httpx.Request] = []
+    context = tool_context(cache, {}, requests)
+
+    with pytest.raises(ValueError, match="last_n is at most 40"):
+        get_team_form(context, "Paris FC", "FL1", last_n=41)
 
     assert requests == []
 

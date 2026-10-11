@@ -106,12 +106,13 @@ def competition_cases(competition: str, recorded: dict[str, Any], today: date) -
     for team in teams["last_result"]:
         form = {"team_name": team, "competition": competition, "last_n": 1}
         cases.append(make_case("last_result", competition, form, team))
-    next_window = {
-        "competition": competition,
-        "date_from": today.isoformat(),
-        "date_to": (today + timedelta(days=NEXT_MATCH_WINDOW_DAYS)).isoformat(),
-    }
     for team in teams["next_match"]:
+        next_window = {
+            "competition": competition,
+            "date_from": today.isoformat(),
+            "date_to": (today + timedelta(days=NEXT_MATCH_WINDOW_DAYS)).isoformat(),
+            "team_name": team,
+        }
         cases.append(make_case("next_match", competition, next_window, team))
     day = last_match_day(matches, today)
     one_day = {"competition": competition, "date_from": day.isoformat(), "date_to": day.isoformat()}
