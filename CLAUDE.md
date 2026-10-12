@@ -39,6 +39,7 @@ notebooks/         # exploration only, never imported by src/
 ## Commands
 
 - Install: `uv sync && uv run pre-commit install`
+  (LLM fine-tuning libraries, several GB: `uv sync --group finetune`; a plain `uv sync` removes them)
 - LLM (once, and after editing the Modelfile): `ollama create football-qwen -f ollama/Modelfile`
   (candidate students: `ollama create football-qwen-<size> -f ollama/Modelfile.<size>`)
 - Lint and format: `uv run ruff check --fix . && uv run ruff format .`

@@ -35,6 +35,16 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.10",
 ]
+# Fine-tuning of the LLM student with QLoRA: several GB, so neither the API image nor the CI
+# installs them. `uv sync` alone removes them: use `uv sync --group finetune`.
+finetune = [
+    "bitsandbytes>=0.50.2",
+    "datasets>=5.1.0",
+    "peft>=0.21.2",
+    "torch>=2.14.1",
+    "transformers>=5.19.0",
+    "trl>=1.15.0",
+]
 
 [tool.ruff]
 line-length = 100
