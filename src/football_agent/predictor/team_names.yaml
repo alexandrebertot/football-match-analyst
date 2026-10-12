@@ -1,6 +1,7 @@
 # football-data.org team id -> team name in the football-data.co.uk CSV files, for the teams
 # of the 2026-27 season. Checked against the 250 matches both sources had in common on
 # 2026-10-05 (same date, teams and score). Add promoted teams here each new season.
+# The teams relegated after 2025-26 were checked the same way on that whole season.
 PL:
   1044: Bournemouth      # AFC Bournemouth
   57:   Arsenal          # Arsenal FC
@@ -22,6 +23,10 @@ PL:
   351:  "Nott'm Forest"  # Nottingham Forest FC
   71:   Sunderland       # Sunderland AFC
   73:   Tottenham        # Tottenham Hotspur FC
+  # Relegated after 2025-26, kept for the predictions on that season (distillation data).
+  76:   Wolves           # Wolverhampton Wanderers FC
+  328:  Burnley          # Burnley FC
+  563:  West Ham         # West Ham United FC
 FL1:
   519:  Auxerre          # AJ Auxerre
   548:  Monaco           # AS Monaco FC
@@ -41,6 +46,9 @@ FL1:
   512:  Brest            # Stade Brestois 29
   529:  Rennes           # Stade Rennais FC 1901
   511:  Toulouse         # Toulouse FC
+  # Relegated after 2025-26.
+  543:  Nantes           # FC Nantes
+  545:  Metz             # FC Metz
 BL1:
   1:    FC Koln          # 1. FC Köln
   28:   Union Berlin     # 1. FC Union Berlin
@@ -60,6 +68,10 @@ BL1:
   12:   Werder Bremen    # SV Werder Bremen
   2:    Hoffenheim       # TSG 1899 Hoffenheim
   10:   Stuttgart        # VfB Stuttgart
+  # Relegated after 2025-26.
+  11:   Wolfsburg        # VfL Wolfsburg
+  20:   St Pauli         # FC St. Pauli 1910
+  44:   Heidenheim       # 1. FC Heidenheim 1846
 SA:
   98:   Milan            # AC Milan
   5911: Monza            # AC Monza
@@ -81,6 +93,10 @@ SA:
   471:  Sassuolo         # US Sassuolo Calcio
   115:  Udinese          # Udinese Calcio
   454:  Venezia          # Venezia FC
+  # Relegated after 2025-26.
+  450:  Verona           # Hellas Verona FC
+  457:  Cremonese        # US Cremonese
+  487:  Pisa             # AC Pisa 1909
 PD:
   77:   Ath Bilbao       # Athletic Club
   79:   Osasuna          # CA Osasuna
@@ -102,3 +118,7 @@ PD:
   559:  Sevilla          # Sevilla FC
   95:   Valencia         # Valencia CF
   94:   Villarreal       # Villarreal CF
+  # Relegated after 2025-26.
+  89:   Mallorca         # RCD Mallorca
+  298:  Girona           # Girona FC
+  1048: Oviedo           # Real Oviedo

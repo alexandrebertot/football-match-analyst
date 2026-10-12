@@ -2,10 +2,11 @@ from collections import Counter
 
 from football_agent.predictor.teams import load_team_names, read_team_names
 
-TEAMS_PER_COMPETITION = {"PL": 20, "FL1": 18, "BL1": 18, "SA": 20, "PD": 20}
+# This season's teams, plus last season's relegated ones, which the distillation data needs.
+TEAMS_PER_COMPETITION = {"PL": 20 + 3, "FL1": 18 + 2, "BL1": 18 + 3, "SA": 20 + 3, "PD": 20 + 3}
 
 
-def test_team_names_cover_every_team_of_the_current_season() -> None:
+def test_team_names_cover_this_season_and_last_season_relegated_teams() -> None:
     by_competition = read_team_names()
 
     assert {competition: len(teams) for competition, teams in by_competition.items()} == (
