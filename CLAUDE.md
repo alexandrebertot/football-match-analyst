@@ -25,6 +25,7 @@ src/football_agent/
     team_names.yaml  # football-data.org team ids -> CSV team names, updated each season
   agent_eval/      # agent evaluation: data snapshots replayed to the tools, questions generated
                    # from them with their expected facts, answer scoring
+  distill/         # distillation data: past-season snapshots (training never uses the evaluation season)
 configs/
   datasets/        # dataset configs: seasons, split, form window
   training/        # training configs: features, LightGBM hyperparameters, early stopping
@@ -65,6 +66,8 @@ notebooks/         # exploration only, never imported by src/
   the model answer without writing its reasoning first)
   (asks every generated question once per pass, scores each answer from its trace, and records
   the run with its traces and the success rate with its 95% confidence interval)
+- Past season for distillation: `uv run --env-file .env python -m football_agent.distill.past_season --season 2025`
+  (downloads every match and team of the season into `data/seasons/<season>.json`, about 2 minutes)
 - MLflow UI: `uv run mlflow ui --backend-store-uri sqlite:///mlflow.db` (experiment `match-outcome`:
   training runs; experiment `agent-traces`: one trace per question asked to the API; experiment
   `agent-evaluation`: one run per evaluation, each answer with its trace and scores)
