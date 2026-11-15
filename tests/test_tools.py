@@ -102,43 +102,44 @@ def test_season_label_joins_start_year_and_next_year(start_date: str, expected: 
     assert season_label(start_date) == expected
 
 
-def test_summarize_standings_keeps_only_useful_fields() -> None:
-    assert summarize_standings(STANDINGS) == {
-        "competition": "Ligue 1",
-        "season": "2026-27",
-        "table": [
-            {
-                "position": 1,
-                "team": "Monaco",
-                "played": 5,
-                "won": 4,
-                "drawn": 1,
-                "lost": 0,
-                "goals_for": 8,
-                "goals_against": 3,
-                "goal_difference": 5,
-                "points": 13,
-            }
-        ],
+def test_summarize_standings_keeps_only_useful_fields_points_first() -> None:
+    summary = summarize_standings(STANDINGS)
+    expected_row = {
+        "position": 1,
+        "team": "Monaco",
+        "points": 13,
+        "played": 5,
+        "won": 4,
+        "drawn": 1,
+        "lost": 0,
+        "goals_for": 8,
+        "goals_against": 3,
+        "goal_difference": 5,
     }
 
+    assert summary == {"competition": "Ligue 1", "season": "2026-27", "table": [expected_row]}
+    assert list(summary["table"][0]) == list(expected_row)
 
-def test_summarize_match_keeps_only_useful_fields() -> None:
+
+def test_summarize_match_keeps_only_useful_fields_duration_last() -> None:
     match = make_match("Paris FC", "Strasbourg", {"home": 2, "away": 1}, "FINISHED")
     match["score"]["halfTime"] = {"home": 1, "away": 0}
-
-    assert summarize_match(match) == {
+    expected = {
         "date": "2026-09-19",
         "weekday": "Saturday",
-        "competition": "FL1",
         "matchday": 5,
         "home": "Paris FC",
         "away": "Strasbourg",
         "score": "2-1",
         "half_time": "1-0",
-        "duration": "REGULAR",
         "status": "FINISHED",
+        "duration": "REGULAR",
     }
+
+    summary = summarize_match(match)
+
+    assert summary == expected
+    assert list(summary) == list(expected)
 
 
 @pytest.mark.parametrize(

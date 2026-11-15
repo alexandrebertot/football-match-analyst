@@ -26,10 +26,12 @@ def summarize_standings(raw: dict[str, Any]) -> dict[str, Any]:
     return {
         "competition": raw["competition"]["name"],
         "season": season_label(raw["season"]["startDate"]),
+        # The LLM reads a table cell by counting columns, so the most asked figures come first.
         "table": [
             {
                 "position": row["position"],
                 "team": row["team"]["shortName"],
+                "points": row["points"],
                 "played": row["playedGames"],
                 "won": row["won"],
                 "drawn": row["draw"],
@@ -37,7 +39,6 @@ def summarize_standings(raw: dict[str, Any]) -> dict[str, Any]:
                 "goals_for": row["goalsFor"],
                 "goals_against": row["goalsAgainst"],
                 "goal_difference": row["goalDifference"],
-                "points": row["points"],
             }
             for row in table
         ],
@@ -49,17 +50,18 @@ WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", 
 
 def summarize_match(match: dict[str, Any]) -> dict[str, Any]:
     kickoff_date = date.fromisoformat(match["utcDate"][:10])
+    # No competition column: every tool returns the matches of the one competition asked for.
+    # The rarely useful duration comes last, as the LLM reads a cell by counting columns.
     return {
         "date": kickoff_date.isoformat(),
         "weekday": WEEKDAYS[kickoff_date.weekday()],
-        "competition": match["competition"]["code"],
         "matchday": match["matchday"],
         "home": match["homeTeam"]["shortName"],
         "away": match["awayTeam"]["shortName"],
         "score": format_score(match["score"]["fullTime"]),
         "half_time": format_score(match["score"]["halfTime"]),
-        "duration": match["score"]["duration"],
         "status": match["status"],
+        "duration": match["score"]["duration"],
     }
 
 
