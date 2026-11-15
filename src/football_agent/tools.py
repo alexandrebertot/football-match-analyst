@@ -1,3 +1,4 @@
+import json
 import unicodedata
 from dataclasses import dataclass
 from datetime import date
@@ -379,3 +380,31 @@ def call_tool(
         available = ", ".join(TOOL_FUNCTIONS)
         raise ValueError(f"Unknown tool '{name}'. Available tools: {available}.")
     return TOOL_FUNCTIONS[name](context, **arguments)
+
+
+def table_text(rows: list[dict[str, Any]]) -> str:
+    """Write rows sharing the same keys as a table: the column names once, then one line per row,
+    with an empty cell for a missing value."""
+    if not rows:
+        return "No results."
+    lines = [" | ".join(rows[0])]
+    for row in rows:
+        lines.append(" | ".join("" if cell is None else str(cell) for cell in row.values()))
+    return "\n".join(lines)
+
+
+def format_tool_result(result: list[dict[str, Any]] | dict[str, Any]) -> str:
+    """Write a tool result for the LLM: its lists of matches or teams as tables, the rest as one
+    `key: value` line per field."""
+    # JSON would repeat every field name on every row, about twice the tokens for the same table.
+    if isinstance(result, list):
+        return table_text(result)
+    lines = []
+    for key, value in result.items():
+        if isinstance(value, list):
+            lines.append(f"{key}:\n{table_text(value)}")
+        elif isinstance(value, dict):
+            lines.append(f"{key}: {json.dumps(value, ensure_ascii=False)}")
+        else:
+            lines.append(f"{key}: {value}")
+    return "\n".join(lines)

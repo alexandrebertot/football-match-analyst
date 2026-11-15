@@ -14,6 +14,7 @@ from football_agent.tools import (
     call_tool,
     find_team,
     format_score,
+    format_tool_result,
     get_matches,
     get_standings,
     get_team_form,
@@ -24,6 +25,7 @@ from football_agent.tools import (
     summarize_match,
     summarize_standings,
     summarize_team_form,
+    table_text,
 )
 
 TODAY = date(2026, 10, 3)
@@ -433,6 +435,41 @@ def test_call_tool_rejects_unknown_tool_and_lists_available_ones(
 
     with pytest.raises(ValueError, match="Unknown tool 'get_odds'. Available tools: get_standings"):
         call_tool(context, "get_odds", {})
+
+
+def test_table_text_writes_column_names_once_and_leaves_missing_values_empty() -> None:
+    rows = [
+        {"home": "PSG", "away": "Lens", "score": "2-1"},
+        {"home": "Lyon", "away": "Nice", "score": None},
+    ]
+
+    assert table_text(rows) == "home | away | score\nPSG | Lens | 2-1\nLyon | Nice | "
+
+
+def test_table_text_of_no_rows_says_so() -> None:
+    assert table_text([]) == "No results."
+
+
+def test_format_tool_result_writes_a_list_of_matches_as_a_table() -> None:
+    matches = [{"home": "PSG", "score": "2-1"}]
+
+    assert format_tool_result(matches) == "home | score\nPSG | 2-1"
+
+
+def test_format_tool_result_writes_one_line_per_field_and_lists_below_their_name() -> None:
+    form = {"team": "PSG", "form": "W", "matches": [{"date": "2026-10-03", "result": "W"}]}
+
+    assert format_tool_result(form) == (
+        "team: PSG\nform: W\nmatches:\ndate | result\n2026-10-03 | W"
+    )
+
+
+def test_format_tool_result_keeps_a_nested_mapping_as_json() -> None:
+    prediction = {"home_win": 0.5, "recent_form": {"PSG": {"goals scored": 2.0, "shots": None}}}
+
+    assert format_tool_result(prediction) == (
+        'home_win: 0.5\nrecent_form: {"PSG": {"goals scored": 2.0, "shots": null}}'
+    )
 
 
 @pytest.mark.parametrize("schema", TOOL_SCHEMAS, ids=lambda schema: schema["function"]["name"])
