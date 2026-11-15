@@ -1,7 +1,7 @@
 from openai import OpenAI
 
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
-MODEL = "football-qwen"
+MODEL = "football-qwen-4b"
 # One reply can take a while with thinking on; past this, Ollama is stuck rather than slow.
 LLM_TIMEOUT_SECONDS = 120
 

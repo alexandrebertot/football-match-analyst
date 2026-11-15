@@ -29,8 +29,9 @@ src/football_agent/
 configs/
   datasets/        # dataset configs: seasons, split, form window
   training/        # training configs: features, LightGBM hyperparameters, early stopping
-ollama/Modelfile   # football-qwen: base model and context size
-ollama/Modelfile.<size>  # smaller Qwen models, candidate students for the distillation
+ollama/Modelfile.4b  # football-qwen-4b: the API model and distillation teacher
+ollama/Modelfile.2b  # football-qwen-2b: the distillation student
+ollama/Modelfile   # football-qwen: the 9B, kept for comparisons
 Dockerfile, compose.yaml  # API image, run with docker compose
 tests/             # mirrors src/ (tests/predictor/ for the predictor)
 notebooks/         # exploration only, never imported by src/
@@ -40,8 +41,9 @@ notebooks/         # exploration only, never imported by src/
 
 - Install: `uv sync && uv run pre-commit install`
   (LLM fine-tuning libraries, several GB: `uv sync --group finetune`; a plain `uv sync` removes them)
-- LLM (once, and after editing the Modelfile): `ollama create football-qwen -f ollama/Modelfile`
-  (candidate students: `ollama create football-qwen-<size> -f ollama/Modelfile.<size>`)
+- LLM (once, and after editing a Modelfile): `ollama create football-qwen-4b -f ollama/Modelfile.4b`
+  (the other models: `ollama create football-qwen-2b -f ollama/Modelfile.2b`,
+  `ollama create football-qwen -f ollama/Modelfile` for the 9B)
 - Lint and format: `uv run ruff check --fix . && uv run ruff format .`
 - Tests: `uv run pytest`
 - API (needs Ollama running and a `champion` model in `mlflow.db`; refreshes the current season
@@ -59,10 +61,10 @@ notebooks/         # exploration only, never imported by src/
 - Evaluation snapshot: `uv run --env-file .env python -m football_agent.agent_eval.snapshot`
   (records the standings, teams and season matches of every competition into
   `data/snapshots/<date>.json`, about 2 minutes because of the API rate limit)
-- Agent evaluation (needs Ollama running; with 3 passes, about 1 hour for the 2B model and 2 hours
-  for the 9B):
+- Agent evaluation (needs Ollama running; with 3 passes, about 1 hour for the 4B and 2B models and
+  1 hour 30 for the 9B):
   `uv run python -m football_agent.agent_eval.run --snapshot data/snapshots/<date>.json --passes 3`
-  (add `--model football-qwen-<size>` to evaluate a candidate student instead of football-qwen,
+  (add `--model <Ollama model>` to evaluate another model than football-qwen-4b,
   `--note "<why this run>"` to give the run a description in MLflow, and `--no-thinking` to let
   the model answer without writing its reasoning first)
   (asks every generated question once per pass, scores each answer from its trace, and records
