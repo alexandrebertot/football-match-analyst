@@ -4,7 +4,7 @@
 
 An LLM agent that answers questions about the top 5 European leagues and the Champions League by
 calling tools: live data from the [football-data.org](https://www.football-data.org) API and a
-LightGBM match outcome predictor. The LLM runs locally: Qwen 3.5 9B served by Ollama on a laptop
+LightGBM match outcome predictor. The LLM runs locally: Qwen 3.5 4B served by Ollama on a laptop
 GPU (RTX 4060, 8 GB).
 
 ![Chat page: the Premier League top 3, then Arsenal's next match with the model's prediction](docs/chat-page.png)
@@ -15,7 +15,7 @@ GPU (RTX 4060, 8 GB).
 flowchart LR
     user([Chat page]) -->|POST /ask| api[FastAPI]
     api --> agent[Agent loop]
-    agent <-->|messages and tool calls| llm["Qwen 3.5 9B<br/>Ollama, local GPU"]
+    agent <-->|messages and tool calls| llm["Qwen 3.5 4B<br/>Ollama, local GPU"]
     agent --> tools{Tools}
     tools -->|standings, matches, form| fdo[("football-data.org API<br/>+ SQLite cache")]
     tools -->|predict_match| predictor[LightGBM predictor]
@@ -78,13 +78,17 @@ the language of the question; each question is asked 3 times, with `mlflow.genai
 
 | Model | Thinking | Success | Generated tokens | Time |
 | --- | --- | --- | --- | --- |
+| Qwen 3.5 9B | on | 95.3% ± 2.2 | 411 | 11.9 s |
 | Qwen 3.5 4B | on | **94.8% ± 2.4** | 454 | 8.0 s |
+| Qwen 3.5 4B | off | 87.7% ± 3.8 | 102 | 3.2 s |
 | Qwen 3.5 2B | on | 81.6% ± 4.2 | 675 | 6.3 s |
 | Qwen 3.5 2B | off | 65.9% ± 5.9 | 140 | 1.7 s |
 
-The 4B, on a par with the 9B but faster, is the teacher for the fine-tuning. The 2B without
-thinking, about 4 times faster than with it, is the student: it trails the 4B by 29 points, on
-French questions above all.
+Question by question, the 9B and the 4B cannot be told apart (+0.5 ± 3.0 points), so the API
+runs the 4B, which is faster and needs half the GPU memory. It is also the teacher for the
+fine-tuning. Without thinking, it loses 7 points, mostly by picking the wrong match from a list.
+The 2B without thinking, about 4 times faster than with it, is the student: it trails the 4B by
+29 points, on French questions above all.
 
 **What it changed.** Each run was read answer by answer, and each fix measured:
 
@@ -131,8 +135,8 @@ an NVIDIA GPU with 8 GB of memory, and a free
 uv sync
 echo "FOOTBALL_DATA_API_KEY=<your key>" > .env
 
-# The LLM: Qwen 3.5 9B with an 8,192-token context, which keeps it fully on an 8 GB GPU
-ollama create football-qwen -f ollama/Modelfile
+# The LLM: Qwen 3.5 4B with an 8,192-token context
+ollama create football-qwen-4b -f ollama/Modelfile.4b
 
 # The predictor: download the history, build the dataset, train, promote to champion, test
 uv run python -m football_agent.predictor.data
@@ -153,7 +157,7 @@ curl -X POST http://localhost:8000/ask -H "Content-Type: application/json" \
 ```
 
 To evaluate the agent, record a snapshot of the data, then ask it every generated question (about
-1 hour with the 2B model, 2 hours with the 9B):
+1 hour with the 4B or 2B model, 1 hour 30 with the 9B):
 
 ```bash
 uv run --env-file .env python -m football_agent.agent_eval.snapshot   # data/snapshots/<date>.json
@@ -191,7 +195,7 @@ src/football_agent/
   agent_eval/     # evaluation: data snapshots, generated questions, scoring, runs
   distill/        # distillation data: snapshots of a past season
 configs/          # dataset and training configs
-ollama/           # LLM settings: the 9B used by the API and the smaller candidates
+ollama/           # LLM settings: the 4B used by the API, the 2B student and the 9B
 tests/
 notebooks/        # data exploration
 ```

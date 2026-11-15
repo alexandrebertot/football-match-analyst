@@ -1,5 +1,6 @@
 FROM qwen3.5:4b-q4_K_M
 
-# A candidate student for the distillation, evaluated with the same context as football-qwen
-# (see ollama/Modelfile) and the same Q4_K_M quantization, so that the models compare fairly.
+# The model of the API and the teacher of the distillation: as accurate as the 9B on the
+# evaluation, and faster. Same context as football-qwen (see ollama/Modelfile) and same Q4_K_M
+# quantization as the 2B, so that the models compare fairly.
 PARAMETER num_ctx 8192
