@@ -47,20 +47,27 @@ League, hence no predictions for it.
 target conceded. Each match only sees the matches played before it, and predictions go through the
 same feature code as training.
 
-**Split.** By whole seasons, in time order: train on 2016-17 to 2022-23, validate on 2023-24 to
-compare configs, test on 2024-25 and 2025-26.
+**Split.** By whole seasons, in time order. Configs are compared by cross-validation: each season
+from 2021-22 to 2023-24 is predicted by a model trained on the seasons before it, the season just
+before serving only for early stopping, so that the scored season never picks the number of trees.
+The model kept is trained the same way, on 2016-17 to 2022-23, and tested once on 2024-25 and
+2025-26. A new config is kept only if, match by match, its log-loss is lower with the whole 95%
+confidence interval of the difference below zero.
 
 **Results** (log-loss, lower is better):
 
-| Model | Validation, 2023-24 | **Test, 2024-25 and 2025-26** |
+| Model | Cross-validation, 2021-22 to 2023-24 | **Test, 2024-25 and 2025-26** |
 | --- | --- | --- |
-| Naive: outcome frequencies of the train seasons | 1.0774 | 1.0750 |
-| **LightGBM champion, 6 features** | 1.0185 | **1.0285** |
-| Bookmakers' closing odds | 0.9533 | 0.9691 |
+| Naive: outcome frequencies of the earlier seasons | 1.0725 | 1.0750 |
+| **LightGBM champion, 6 features** | 1.0255 | **1.0285** |
+| Bookmakers' closing odds | 0.9684 | 0.9691 |
 
-On the test seasons, scored once after choosing the model, it closes 44% of the gap between the
-naive baseline and the closing odds (47% on validation, which was used to choose it). Beating the
-odds is not expected: they include team news, injuries and line-ups that match statistics do not.
+It closes 45% of the gap between the naive baseline and the closing odds in cross-validation, and
+44% on the test seasons. From one season to the next, that share goes from 40% (2021-22) to 51%
+(2022-23): a single validation season is a noisy judge. The champion was chosen on 2023-24 alone,
+before the cross-validation existed; it is now the baseline that new features must beat. Beating
+the odds is not expected: they include team news, injuries and line-ups that match statistics do
+not.
 
 **Tracking.** Datasets and training runs are described by YAML configs in [`configs/`](configs).
 Each run is tracked in MLflow, and the chosen one is registered as the `champion` version of the
@@ -123,9 +130,10 @@ once.
   nothing leaks into the evaluation
 - [ ] **Better agent**: system prompt and tool outputs, each change measured by the evaluation
 - [ ] **Online demo**: the chat page hosted publicly with the fine-tuned model
-- [ ] **Better predictor**: more match statistics (corners, cards), expected goals from another
-  source, an Elo rating, hyperparameter tuning with time-based cross-validation, then a final
-  score on the held-out test seasons
+- [ ] **Better predictor**, each step judged by the cross-validation: history back to 2007-08
+  with recent seasons weighted more, an Elo rating, less weight on the matches played without
+  fans, recency-weighted form, shots and corners, hyperparameter tuning, then a final score on
+  the held-out test seasons
 - [ ] **Team names**: map the teams of the two data sources automatically, from the matches they
   share, instead of by hand each season
 
