@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, log_loss
@@ -7,6 +9,8 @@ from football_agent.predictor.config import Split
 # Alphabetical order: scikit-learn metrics read probability columns in sorted label order,
 # so every probability array in the project uses columns (away, draw, home).
 OUTCOMES = ["A", "D", "H"]
+# 95% of a normal distribution lies within 1.96 standard deviations of its mean.
+Z_95 = 1.96
 
 
 def temporal_split(
@@ -38,6 +42,19 @@ def evaluate(probabilities: np.ndarray, results: pd.Series) -> dict[str, float]:
         "log_loss": log_loss(results, probabilities, labels=OUTCOMES),
         "accuracy": accuracy_score(results, predicted),
     }
+
+
+def match_log_losses(probabilities: np.ndarray, results: pd.Series) -> np.ndarray:
+    """Log-loss of each match: minus the log of the probability given to its actual result."""
+    columns = results.map({outcome: column for column, outcome in enumerate(OUTCOMES)})
+    return -np.log(probabilities[np.arange(len(results)), columns.to_numpy()])
+
+
+def paired_difference(baseline: np.ndarray, candidate: np.ndarray) -> tuple[float, float]:
+    """Mean of the per-match differences `candidate - baseline` and the half-width of its 95%
+    confidence interval. A negative mean means the candidate predicts better."""
+    differences = candidate - baseline
+    return differences.mean(), Z_95 * differences.std(ddof=1) / math.sqrt(len(differences))
 
 
 def compare_with_baselines(
