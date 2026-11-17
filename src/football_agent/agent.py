@@ -9,7 +9,13 @@ from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageToolCall
 
 from football_agent.llm import MODEL
-from football_agent.tools import TOOL_SCHEMAS, WEEKDAYS, ToolContext, call_tool
+from football_agent.tools import (
+    TOOL_SCHEMAS,
+    WEEKDAYS,
+    ToolContext,
+    call_tool,
+    format_tool_result,
+)
 
 MAX_TOOL_ROUNDS = 5
 
@@ -26,13 +32,13 @@ def build_system_prompt(today: date) -> str:
 
 
 def run_tool_call(context: ToolContext, tool_call: ChatCompletionMessageToolCall) -> str:
-    """Run one tool call and return its result as JSON, or an error message the LLM can act on."""
+    """Run one tool call and return its result as text, or an error message the LLM can act on."""
     try:
         arguments = json.loads(tool_call.function.arguments)
         result = call_tool(context, tool_call.function.name, arguments)
     except (json.JSONDecodeError, ValueError, TypeError, httpx.HTTPError) as error:
         return f"Error: {error}"
-    return json.dumps(result, ensure_ascii=False)
+    return format_tool_result(result)
 
 
 def answer(

@@ -1,4 +1,3 @@
-import json
 import sqlite3
 from datetime import date
 
@@ -12,7 +11,12 @@ from fakes import FakeLLM, text_reply, tool_reply
 from football_agent.agent import MAX_TOOL_ROUNDS, answer, build_system_prompt, run_tool_call
 from football_agent.data_api import BASE_URL, FootballDataClient
 from football_agent.llm import MODEL
-from football_agent.tools import TOOL_SCHEMAS, ToolContext
+from football_agent.tools import (
+    TOOL_SCHEMAS,
+    ToolContext,
+    format_tool_result,
+    summarize_standings,
+)
 
 TODAY = date(2026, 10, 3)
 
@@ -60,12 +64,12 @@ def test_build_system_prompt_gives_today_weekday_and_date() -> None:
     assert "Today is Saturday 2026-10-03." in build_system_prompt(TODAY)
 
 
-def test_run_tool_call_returns_tool_result_as_json(cache: sqlite3.Connection) -> None:
+def test_run_tool_call_returns_tool_result_as_text(cache: sqlite3.Connection) -> None:
     tool_call = make_tool_call("get_standings", '{"competition": "FL1"}')
 
     result = run_tool_call(tool_context(cache), tool_call)
 
-    assert json.loads(result)["table"][0]["team"] == "Monaco"
+    assert result == format_tool_result(summarize_standings(STANDINGS))
 
 
 @pytest.mark.parametrize(
