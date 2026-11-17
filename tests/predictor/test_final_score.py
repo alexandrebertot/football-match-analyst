@@ -22,7 +22,7 @@ def test_score_champion_on_test_records_the_scores_in_the_champion_run(
 
     metrics = MlflowClient().get_run(champion_run_id).data.metrics
     assert {name: metrics[metric] for name, metric in TEST_METRICS.items()} == pytest.approx(scores)
-    assert metrics["validation_log_loss"] != scores["log_loss"]
+    assert metrics["cv_log_loss"] != scores["log_loss"]
 
 
 def test_score_champion_on_test_never_reads_the_test_seasons_twice(

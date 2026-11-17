@@ -12,16 +12,17 @@ from lightgbm import LGBMClassifier
 from football_agent.predictor.config import TrainingConfig, load_training_config
 from football_agent.predictor.evaluation import (
     OUTCOMES,
-    compare_with_baselines,
     market_probabilities,
     match_log_losses,
     naive_probabilities,
+    summarize_folds,
 )
 from football_agent.predictor.prepare import PROCESSED_DATA_DIR, load_dataset
 
 EXPERIMENT_NAME = "match-outcome"
 # What identifies a scored match, so that two runs can be compared match by match.
 MATCH_COLUMNS = ["season", "date", "home_team", "away_team", "result"]
+MATCH_SCORES_FILE = "match_scores.csv"
 
 
 def train_model(
@@ -103,7 +104,8 @@ def feature_importance(model: LGBMClassifier) -> dict[str, dict[str, float]]:
 
 
 def run_experiment(dataset_dir: Path, config: TrainingConfig) -> dict[str, float]:
-    """Train on a prepared dataset, score its validation part, and record everything in MLflow."""
+    """Cross-validate a config on the validation seasons of a prepared dataset, train the model to
+    keep on the seasons before the test ones, and record everything in MLflow."""
     dataset_config, parts = load_dataset(dataset_dir)
     train, validation = parts["train"], parts["validation"]
     missing = set(config.features) - set(train.columns)
@@ -111,6 +113,8 @@ def run_experiment(dataset_dir: Path, config: TrainingConfig) -> dict[str, float
         raise ValueError(
             f"Dataset {dataset_config.name} has no {sorted(missing)}: prepare it again"
         )
+    before_test = pd.concat([train, validation], ignore_index=True)
+    split = dataset_config.split
 
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run(run_name=config.run.name):
@@ -118,10 +122,13 @@ def run_experiment(dataset_dir: Path, config: TrainingConfig) -> dict[str, float
         for context, rows in [("training", train), ("validation", validation)]:
             name = f"{dataset_config.name}-{context}"
             mlflow.log_input(mlflow.data.from_pandas(rows, name=name), context=context)
-        model = train_model(train, validation, config)
-        probabilities = model.predict_proba(validation[config.features])
-        scores = compare_with_baselines(probabilities, train, validation)
-        split = dataset_config.split
+        scores = cross_validate(before_test, split.validation.to_range(), config)
+        metrics = summarize_folds(scores)
+        # The model to keep is trained like one more fold, the one that would score the first
+        # test season, so that the cross-validation measures the recipe that makes it.
+        early_stopping = config.training.early_stopping_rounds is not None
+        fit, stopping, _ = fold_parts(before_test, split.test.first, early_stopping)
+        model = train_model(fit, stopping, config)
         mlflow.log_params(
             {
                 "dataset": dataset_config.name,
@@ -129,24 +136,18 @@ def run_experiment(dataset_dir: Path, config: TrainingConfig) -> dict[str, float
                 "form_window": dataset_config.features.form_window,
                 "train_seasons": f"{split.train.first}-{split.train.last}",
                 "validation_seasons": f"{split.validation.first}-{split.validation.last}",
+                "fit_seasons": f"{fit['season'].min()}-{fit['season'].max()}",
                 "early_stopping_rounds": config.training.early_stopping_rounds,
                 **model.get_params(),
             }
         )
-        mlflow.log_metrics(
-            {
-                "validation_log_loss": scores["log_loss"],
-                "validation_accuracy": scores["accuracy"],
-                "naive_validation_log_loss": scores["naive_log_loss"],
-                "market_validation_log_loss": scores["market_log_loss"],
-                "iterations": model.best_iteration_ or model.n_estimators_,
-            }
-        )
+        mlflow.log_metrics({**metrics, "iterations": model.best_iteration_ or model.n_estimators_})
+        mlflow.log_text(scores.to_csv(index=False), MATCH_SCORES_FILE)
         mlflow.log_dict(config.model_dump(), "training_config.yaml")
         mlflow.log_dict(dataset_config.model_dump(), "dataset_config.yaml")
         mlflow.log_dict(feature_importance(model), "feature_importance.json")
         mlflow.lightgbm.log_model(model, name="model")
-    return scores
+    return metrics
 
 
 if __name__ == "__main__":

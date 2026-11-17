@@ -13,6 +13,7 @@ from football_agent.predictor.evaluation import (
     match_log_losses,
     naive_probabilities,
     paired_difference,
+    summarize_folds,
     temporal_split,
 )
 
@@ -105,6 +106,30 @@ def test_paired_difference_ignores_how_hard_each_match_is() -> None:
 
     assert mean == pytest.approx(-0.01)
     assert half_width == pytest.approx(0.0, abs=1e-12)
+
+
+def test_summarize_folds_gives_each_season_then_every_match_and_the_gap_closed() -> None:
+    scores = pd.DataFrame(
+        {
+            "season": [2021, 2021, 2022],
+            "log_loss": [1.0, 0.8, 0.9],
+            "naive_log_loss": [1.1, 1.1, 1.1],
+            "market_log_loss": [0.8, 0.8, 0.8],
+        }
+    )
+
+    metrics = summarize_folds(scores)
+
+    assert metrics == pytest.approx(
+        {
+            "cv_log_loss_2021": 0.9,
+            "cv_log_loss_2022": 0.9,
+            "cv_log_loss": 0.9,
+            "cv_naive_log_loss": 1.1,
+            "cv_market_log_loss": 0.8,
+            "cv_gap_closed": (1.1 - 0.9) / (1.1 - 0.8),
+        }
+    )
 
 
 def test_compare_with_baselines_scores_the_model_and_both_baselines_on_the_same_matches() -> None:

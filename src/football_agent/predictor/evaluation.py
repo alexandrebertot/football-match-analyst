@@ -57,6 +57,19 @@ def paired_difference(baseline: np.ndarray, candidate: np.ndarray) -> tuple[floa
     return differences.mean(), Z_95 * differences.std(ddof=1) / math.sqrt(len(differences))
 
 
+def summarize_folds(scores: pd.DataFrame) -> dict[str, float]:
+    """Metrics of a cross-validation from its per-match `scores`: the model's log-loss on each
+    validation season, then over every scored match the log-loss of the model and of both
+    baselines, and the share of the gap closed."""
+    means = scores[["log_loss", "naive_log_loss", "market_log_loss"]].mean().to_dict()
+    per_season = scores.groupby("season")["log_loss"].mean()
+    return {
+        **{f"cv_log_loss_{season}": float(loss) for season, loss in per_season.items()},
+        **{f"cv_{name}": float(value) for name, value in means.items()},
+        "cv_gap_closed": gap_closed(means),
+    }
+
+
 def compare_with_baselines(
     probabilities: np.ndarray, train: pd.DataFrame, matches: pd.DataFrame
 ) -> dict[str, float]:

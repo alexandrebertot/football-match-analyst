@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 
 import mlflow
@@ -123,23 +124,33 @@ def test_run_experiment_records_data_configs_metrics_and_model(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("MLFLOW_TRACKING_URI", f"sqlite:///{tmp_path / 'mlflow.db'}")
 
-    scores = run_experiment(dataset_dir, training_config)
+    metrics = run_experiment(dataset_dir, training_config)
 
     run = mlflow.search_runs(experiment_names=[EXPERIMENT_NAME], output_format="list")[0]
     assert run.info.run_name == "test-run"
-    assert run.data.metrics["validation_log_loss"] == pytest.approx(scores["log_loss"])
-    assert {"naive_validation_log_loss", "market_validation_log_loss", "iterations"} <= set(
-        run.data.metrics
-    )
-    assert (run.data.params["dataset"], run.data.params["train_seasons"]) == (
+    assert run.data.metrics == pytest.approx({**metrics, "iterations": 100})
+    assert set(metrics) == {
+        "cv_log_loss_2018",
+        "cv_log_loss",
+        "cv_naive_log_loss",
+        "cv_market_log_loss",
+        "cv_gap_closed",
+    }
+    params = run.data.params
+    assert (params["dataset"], params["train_seasons"], params["fit_seasons"]) == (
         "synthetic",
         "2016-2017",
+        "2016-2018",
     )
     assert sorted(item.dataset.name for item in run.inputs.dataset_inputs) == [
         "synthetic-training",
         "synthetic-validation",
     ]
     artifacts = run.info.artifact_uri
+    match_scores_csv = mlflow.artifacts.load_text(f"{artifacts}/match_scores.csv")
+    match_scores = pd.read_csv(io.StringIO(match_scores_csv))
+    assert list(match_scores["season"].unique()) == [2018]
+    assert match_scores["log_loss"].mean() == pytest.approx(metrics["cv_log_loss"])
     training_yaml = mlflow.artifacts.load_text(f"{artifacts}/training_config.yaml")
     assert yaml.safe_load(training_yaml) == training_config.model_dump()
     assert set(mlflow.artifacts.load_dict(f"{artifacts}/feature_importance.json")) == {
