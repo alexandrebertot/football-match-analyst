@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, log_loss
@@ -7,6 +9,8 @@ from football_agent.predictor.config import Split
 # Alphabetical order: scikit-learn metrics read probability columns in sorted label order,
 # so every probability array in the project uses columns (away, draw, home).
 OUTCOMES = ["A", "D", "H"]
+# 95% of a normal distribution lies within 1.96 standard deviations of its mean.
+Z_95 = 1.96
 
 
 def temporal_split(
@@ -40,17 +44,43 @@ def evaluate(probabilities: np.ndarray, results: pd.Series) -> dict[str, float]:
     }
 
 
+def match_log_losses(probabilities: np.ndarray, results: pd.Series) -> np.ndarray:
+    """Log-loss of each match: minus the log of the probability given to its actual result."""
+    columns = results.map({outcome: column for column, outcome in enumerate(OUTCOMES)})
+    return -np.log(probabilities[np.arange(len(results)), columns.to_numpy()])
+
+
+def paired_difference(baseline: np.ndarray, candidate: np.ndarray) -> tuple[float, float]:
+    """Mean of the per-match differences `candidate - baseline` and the half-width of its 95%
+    confidence interval. A negative mean means the candidate predicts better."""
+    differences = candidate - baseline
+    return differences.mean(), Z_95 * differences.std(ddof=1) / math.sqrt(len(differences))
+
+
+def summarize_folds(scores: pd.DataFrame) -> dict[str, float]:
+    """Metrics of a cross-validation from its per-match `scores`: the model's log-loss on each
+    validation season, then over every scored match the log-loss of the model and of both
+    baselines, and the share of the gap closed."""
+    means = scores[["log_loss", "naive_log_loss", "market_log_loss"]].mean().to_dict()
+    per_season = scores.groupby("season")["log_loss"].mean()
+    return {
+        **{f"cv_log_loss_{season}": float(loss) for season, loss in per_season.items()},
+        **{f"cv_{name}": float(value) for name, value in means.items()},
+        "cv_gap_closed": gap_closed(means),
+    }
+
+
 def compare_with_baselines(
-    probabilities: np.ndarray, train: pd.DataFrame, matches: pd.DataFrame
+    probabilities: np.ndarray, before: pd.DataFrame, matches: pd.DataFrame
 ) -> dict[str, float]:
     """Score a model's `probabilities` on `matches`, along with the naive and market baselines.
 
-    The naive baseline uses the outcome frequencies of `train`, the seasons the model learned from.
+    The naive baseline uses the outcome frequencies of `before`, the seasons before `matches`.
     """
     results = matches["result"]
     return {
         **evaluate(probabilities, results),
-        "naive_log_loss": evaluate(naive_probabilities(train, len(matches)), results)["log_loss"],
+        "naive_log_loss": evaluate(naive_probabilities(before, len(matches)), results)["log_loss"],
         "market_log_loss": evaluate(market_probabilities(matches), results)["log_loss"],
     }
 

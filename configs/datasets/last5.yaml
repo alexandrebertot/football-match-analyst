@@ -4,11 +4,11 @@ seasons:            # start years, both ends included: 2016-17 to 2025-26
   first: 2016
   last: 2025
 split:
-  train:
+  train:            # only ever trained on
     first: 2016
-    last: 2022
-  validation:
-    first: 2023
+    last: 2020
+  validation:       # each season is scored by a model trained on the seasons before it
+    first: 2021     # 2020-21, played without fans, is not like the matches the API predicts
     last: 2023
   test:
     first: 2024

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import mlflow
+import pandas as pd
 from mlflow import MlflowClient
 
 from football_agent.predictor.evaluation import compare_with_baselines, gap_closed
@@ -32,7 +33,8 @@ def score_champion_on_test(processed_dir: Path) -> dict[str, float]:
     _, parts = load_dataset(processed_dir / dataset_config.name)
     test = parts["test"]
     probabilities = model.predict_proba(test[model.feature_name_])
-    scores = compare_with_baselines(probabilities, parts["train"], test)
+    before_test = pd.concat([parts["train"], parts["validation"]])
+    scores = compare_with_baselines(probabilities, before_test, test)
     with mlflow.start_run(run_id=run_id):
         mlflow.log_metrics({metric: scores[name] for name, metric in TEST_METRICS.items()})
     return scores

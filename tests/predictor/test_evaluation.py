@@ -10,7 +10,10 @@ from football_agent.predictor.evaluation import (
     evaluate,
     gap_closed,
     market_probabilities,
+    match_log_losses,
     naive_probabilities,
+    paired_difference,
+    summarize_folds,
     temporal_split,
 )
 
@@ -71,6 +74,62 @@ def test_evaluate_gives_ln3_for_uniform_predictions() -> None:
     scores = evaluate(np.full((4, 3), 1 / 3), results)
 
     assert scores["log_loss"] == pytest.approx(math.log(3))
+
+
+def test_match_log_losses_take_the_actual_result_probability_and_average_to_the_log_loss() -> None:
+    probabilities = np.array([[0.1, 0.2, 0.7], [0.2, 0.3, 0.5]])
+    results = pd.Series(["H", "A"])
+
+    losses = match_log_losses(probabilities, results)
+
+    assert losses == pytest.approx([-math.log(0.7), -math.log(0.2)])
+    assert losses.mean() == pytest.approx(evaluate(probabilities, results)["log_loss"])
+
+
+def test_paired_difference_matches_a_hand_computed_interval() -> None:
+    # Differences -0.1, 0, -0.2, -0.1: mean -0.1, standard deviation sqrt(0.02 / 3).
+    baseline = np.array([1.0, 1.0, 1.0, 1.0])
+    candidate = np.array([0.9, 1.0, 0.8, 0.9])
+
+    mean, half_width = paired_difference(baseline, candidate)
+
+    assert mean == pytest.approx(-0.1)
+    assert half_width == pytest.approx(1.96 * math.sqrt(0.02 / 3) / 2)
+
+
+def test_paired_difference_ignores_how_hard_each_match_is() -> None:
+    # Losses that vary a lot from match to match, and a candidate better by 0.01 on every one.
+    baseline = np.array([0.2, 1.5, 0.7, 2.3, 1.1])
+    candidate = baseline - 0.01
+
+    mean, half_width = paired_difference(baseline, candidate)
+
+    assert mean == pytest.approx(-0.01)
+    assert half_width == pytest.approx(0.0, abs=1e-12)
+
+
+def test_summarize_folds_gives_each_season_then_every_match_and_the_gap_closed() -> None:
+    scores = pd.DataFrame(
+        {
+            "season": [2021, 2021, 2022],
+            "log_loss": [1.0, 0.8, 0.9],
+            "naive_log_loss": [1.1, 1.1, 1.1],
+            "market_log_loss": [0.8, 0.8, 0.8],
+        }
+    )
+
+    metrics = summarize_folds(scores)
+
+    assert metrics == pytest.approx(
+        {
+            "cv_log_loss_2021": 0.9,
+            "cv_log_loss_2022": 0.9,
+            "cv_log_loss": 0.9,
+            "cv_naive_log_loss": 1.1,
+            "cv_market_log_loss": 0.8,
+            "cv_gap_closed": (1.1 - 0.9) / (1.1 - 0.8),
+        }
+    )
 
 
 def test_compare_with_baselines_scores_the_model_and_both_baselines_on_the_same_matches() -> None:
