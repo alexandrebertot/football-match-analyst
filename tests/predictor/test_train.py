@@ -2,6 +2,7 @@ import io
 from pathlib import Path
 
 import mlflow
+import numpy as np
 import pandas as pd
 import pytest
 import yaml
@@ -16,6 +17,7 @@ from football_agent.predictor.train import (
     cross_validate,
     feature_importance,
     fold_parts,
+    recency_weights,
     run_experiment,
     train_model,
 )
@@ -46,6 +48,34 @@ def test_train_model_with_early_stopping_stops_before_the_iteration_limit(
     model = train_model(parts["train"], parts["validation"], config)
 
     assert 0 < model.best_iteration_ < 500
+
+
+def test_recency_weights_halve_every_half_life_before_the_last_season() -> None:
+    weights = recency_weights(pd.Series([2016, 2018, 2019, 2020, 2020]), half_life=2)
+
+    assert weights == pytest.approx([0.25, 0.5, 2**-0.5, 1, 1])
+
+
+def test_recency_weights_count_the_age_from_the_last_season_given() -> None:
+    weights = recency_weights(pd.Series([2016, 2017]), half_life=1)
+
+    assert weights == pytest.approx([0.5, 1])
+
+
+def test_train_model_with_a_half_life_learns_differently(
+    dataset_dir: Path, training_config: TrainingConfig
+) -> None:
+    _, parts = load_dataset(dataset_dir)
+    weighted = training_config.model_copy(deep=True)
+    weighted.training.half_life_seasons = 1
+    features = parts["validation"][FEATURE_COLUMNS]
+
+    equal_model = train_model(parts["train"], parts["validation"], training_config)
+    weighted_model = train_model(parts["train"], parts["validation"], weighted)
+
+    assert not np.allclose(
+        equal_model.predict_proba(features), weighted_model.predict_proba(features)
+    )
 
 
 def test_fold_parts_keep_the_season_before_the_scored_one_to_stop_the_training() -> None:
@@ -80,12 +110,21 @@ def test_cross_validate_scores_every_match_of_the_validation_seasons(
     assert (scores[["log_loss", "naive_log_loss", "market_log_loss"]] > 0).all().all()
 
 
+@pytest.mark.parametrize(
+    ("early_stopping_rounds", "half_life_seasons"),
+    [(5, None), (None, 1)],
+    ids=["early-stopping", "recency-weights"],
+)
 def test_cross_validate_never_learns_from_a_later_season(
-    league: pd.DataFrame, training_config: TrainingConfig
+    league: pd.DataFrame,
+    training_config: TrainingConfig,
+    early_stopping_rounds: int | None,
+    half_life_seasons: float | None,
 ) -> None:
     config = training_config.model_copy(deep=True)
     config.model.n_estimators = 500
-    config.training.early_stopping_rounds = 5
+    config.training.early_stopping_rounds = early_stopping_rounds
+    config.training.half_life_seasons = half_life_seasons
     rows = build_features(league, window=5)
     later_changed = rows.copy()
     later_changed.loc[later_changed["season"] == 2019, "result"] = "H"
