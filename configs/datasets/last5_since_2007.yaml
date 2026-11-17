@@ -1,0 +1,17 @@
+# last5 with the history back to 2007-08: same features and same validation and test seasons.
+name: last5-since-2007
+seasons:            # start years, both ends included: 2007-08 to 2025-26
+  first: 2007
+  last: 2025
+split:
+  train:            # only ever trained on
+    first: 2007
+    last: 2020
+  validation:       # each season is scored by a model trained on the seasons before it
+    first: 2021
+    last: 2023
+  test:
+    first: 2024
+    last: 2025
+features:
+  form_window: 5
