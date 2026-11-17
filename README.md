@@ -24,8 +24,8 @@ flowchart LR
 ```
 
 The agent sends the question and the tools' JSON schemas to the LLM, runs the tool calls it asks
-for and sends the results back, until the LLM answers in text. Tool errors, such as an unknown team
-name, go back to the LLM as messages so that it can fix its arguments. The loop is written by hand,
+for and sends the results back as short text tables, until the LLM answers in text. Tool errors,
+such as an unknown team name, go back to the LLM as messages so that it can fix its arguments. The loop is written by hand,
 without a framework, so that the exact conversation format is known: it is what the fine-tuning
 step will reproduce. Every question is traced in MLflow: each LLM call with its prompt and tokens,
 and each tool call with its arguments and result.
@@ -99,6 +99,10 @@ The 2B without thinking, about 4 times faster than with it, is the student: it t
 - The 2B kept retrying when `get_matches` refused a team without dates: it now returns the team's
   whole season ("next match" questions went from 33% to 67%).
 - `predict_match` now refuses the competitions its model was not trained on.
+- Tool results went to the LLM as JSON, which repeats every field name on every row (the results
+  table above was measured that way). They are now text tables, the most asked figures first:
+  about half the tokens per result and 16% fewer input tokens per answer. The 4B scores 95.3% ±
+  2.4 (+0.5 ± 3.0 points question by question), the 2B without thinking 63.3% ± 6.1 (-2.6 ± 6.0).
 
 **Limits.** The scoring is strict on purpose and only checks the facts asked for. As these choices
 were made on it, it serves as a validation set: final scores will come from a later snapshot, used
