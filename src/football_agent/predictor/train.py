@@ -6,6 +6,7 @@ import lightgbm
 import mlflow
 import mlflow.data
 import mlflow.lightgbm
+import numpy as np
 import pandas as pd
 from lightgbm import LGBMClassifier
 
@@ -25,10 +26,18 @@ MATCH_COLUMNS = ["season", "date", "home_team", "away_team", "result"]
 MATCH_SCORES_FILE = "match_scores.csv"
 
 
+def recency_weights(seasons: pd.Series, half_life: float) -> np.ndarray:
+    """Weight of each match: 1 for the last season of `seasons`, halved every `half_life` seasons
+    before it."""
+    age = seasons.max() - seasons
+    return 0.5 ** (age / half_life).to_numpy()
+
+
 def train_model(
     train: pd.DataFrame, validation: pd.DataFrame, config: TrainingConfig
 ) -> LGBMClassifier:
-    """Train on `train`; with early stopping, stop when the validation log-loss stops improving."""
+    """Train on `train`; with early stopping, stop when the validation log-loss stops improving.
+    With a half-life, older seasons of `train` weigh less."""
     # Labels are encoded as OUTCOMES indices, so probability column i is OUTCOMES[i]. LightGBM's
     # eval_y does not accept text labels.
     codes = {outcome: code for code, outcome in enumerate(OUTCOMES)}
@@ -42,6 +51,9 @@ def train_model(
                 lightgbm.early_stopping(config.training.early_stopping_rounds, verbose=False)
             ],
         }
+    half_life = config.training.half_life_seasons
+    if half_life is not None:
+        fit_options["sample_weight"] = recency_weights(train["season"], half_life)
     model.fit(train[config.features], train["result"].map(codes), **fit_options)
     if len(model.classes_) != len(OUTCOMES):
         raise ValueError(f"Training data covers only classes {list(model.classes_)}.")
@@ -141,6 +153,7 @@ def run_experiment(dataset_dir: Path, config: TrainingConfig) -> dict[str, float
                 "validation_seasons": f"{split.validation.first}-{split.validation.last}",
                 "fit_seasons": f"{fit['season'].min()}-{fit['season'].max()}",
                 "early_stopping_rounds": config.training.early_stopping_rounds,
+                "half_life_seasons": config.training.half_life_seasons,
                 **model.get_params(),
             }
         )

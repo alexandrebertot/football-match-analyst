@@ -77,6 +77,8 @@ class ModelParams(StrictModel):
 
 class TrainingOptions(StrictModel):
     early_stopping_rounds: int | None = Field(gt=0)
+    # Seasons after which a match counts half as much; None weighs every season the same.
+    half_life_seasons: float | None = Field(default=None, gt=0)
 
 
 class TrainingConfig(StrictModel):

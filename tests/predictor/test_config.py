@@ -100,6 +100,7 @@ def test_load_training_config_reads_a_valid_file(tmp_path: Path) -> None:
     assert config.run.name == "baseline-form"
     assert config.model.learning_rate == 0.1
     assert config.training.early_stopping_rounds is None
+    assert config.training.half_life_seasons is None
 
 
 @pytest.mark.parametrize(
@@ -110,6 +111,7 @@ def test_load_training_config_reads_a_valid_file(tmp_path: Path) -> None:
         ("  learning_rate: 0.1", "  learning_rate: 0"),
         ("  - away_points_avg", "  - away_points_av"),
         ("early_stopping_rounds: null", "early_stopping_rounds: 0"),
+        ("early_stopping_rounds: null", "early_stopping_rounds: null\n  half_life_seasons: 0"),
     ],
     ids=[
         "missing-hyperparameter",
@@ -117,6 +119,7 @@ def test_load_training_config_reads_a_valid_file(tmp_path: Path) -> None:
         "non-positive-learning-rate",
         "unknown-feature",
         "non-positive-early-stopping",
+        "non-positive-half-life",
     ],
 )
 def test_load_training_config_rejects_invalid_files(tmp_path: Path, old: str, new: str) -> None:
