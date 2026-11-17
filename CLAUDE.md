@@ -56,6 +56,10 @@ notebooks/         # exploration only, never imported by src/
   (scores each validation season of the dataset with a model trained on the seasons before it,
   early stopping on the season just before; then trains the model to keep the same way, as if it
   were to score the first test season. Configs are compared on `cv_log_loss`)
+- Predictor comparison: `uv run python -m football_agent.predictor.compare --baseline <run name> --candidate <run name>`
+  (compares the two latest runs with these names match by match; the candidate is kept only if
+  the whole 95% confidence interval of the log-loss difference is below zero; the comparison and
+  the decision are recorded in the candidate run)
 - Predictor champion: `uv run python -m football_agent.predictor.registry --run <run name>`
   (registers the latest run with that name as a new version of `match-outcome` and moves the
   `champion` alias to it; the agent always loads `models:/match-outcome@champion`)
