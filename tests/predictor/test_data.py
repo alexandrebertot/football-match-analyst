@@ -117,6 +117,15 @@ def test_load_season_reads_old_format_files(tmp_path: Path) -> None:
     assert pd.isna(match["average_odds_home"])
 
 
+def test_load_season_drops_the_lines_of_empty_cells_after_the_last_match(tmp_path: Path) -> None:
+    path = tmp_path / "SA_1213.csv"
+    path.write_text(OLD_FORMAT_CSV + ",,,,,,,,,,,,,\n" * 3, encoding="utf-8")
+
+    matches = load_season(path, "SA", 2012)
+
+    assert list(matches["home_team"]) == ["Burnley"]
+
+
 def test_load_matches_stacks_every_competition_sorted_by_date(tmp_path: Path) -> None:
     for i, competition in enumerate(LEAGUE_FILES):
         # One match per competition, dated in reverse order of the loading loop.

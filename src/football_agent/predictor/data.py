@@ -69,7 +69,8 @@ def download_season(
 
 def load_season(path: Path, competition: str, season_start: int) -> pd.DataFrame:
     """Load one season's CSV with our column names; columns missing from old files become NaN."""
-    raw = pd.read_csv(path, encoding="utf-8-sig")
+    # Some files of 2012-13 to 2015-16 end with lines of empty cells after the last match.
+    raw = pd.read_csv(path, encoding="utf-8-sig").dropna(how="all")
     matches = raw.reindex(columns=list(COLUMNS)).rename(columns=COLUMNS)
     # Older files write two-digit years (13/08/16), newer ones four-digit years (15/08/2025).
     date_format = "%d/%m/%y" if len(matches["date"].iloc[0]) == 8 else "%d/%m/%Y"
