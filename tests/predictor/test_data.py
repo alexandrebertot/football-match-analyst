@@ -8,6 +8,7 @@ import pytest
 
 from football_agent.predictor.data import (
     COLUMNS,
+    FIRST_SEASON,
     LEAGUE_FILES,
     csv_url,
     current_season,
@@ -32,6 +33,10 @@ NEW_FORMAT_CSV = (
     "E0,15/08/2025,20:00,Liverpool,Bournemouth,4,2,H,A Taylor,19,10,10,3,"
     "1.29,6.55,9.75,1.29,6.02,8.68\n"
 )
+# The history's first season is finished on both days. The next one is under way on the first
+# day; on the second, it has started but football-data.co.uk has no file for it yet.
+SECOND_SEASON_UNDER_WAY = date(FIRST_SEASON + 1, 10, 1)
+SECOND_SEASON_UNPUBLISHED = date(FIRST_SEASON + 1, 8, 5)
 
 
 @pytest.mark.parametrize(
@@ -152,27 +157,25 @@ def test_download_season_with_overwrite_replaces_the_file(tmp_path: Path) -> Non
 def test_download_history_refreshes_only_the_season_under_way(tmp_path: Path) -> None:
     requests: list[httpx.Request] = []
     http = fake_http(requests)
-    # On 2017-10-01, 2016-17 is finished and 2017-18 is under way.
-    today = date(2017, 10, 1)
 
-    download_history(http, tmp_path, today)
-    download_history(http, tmp_path, today)
+    download_history(http, tmp_path, SECOND_SEASON_UNDER_WAY)
+    download_history(http, tmp_path, SECOND_SEASON_UNDER_WAY)
 
     downloads = Counter(request.url.path for request in requests)
-    assert downloads["/mmz4281/1617/F1.csv"] == 1
-    assert downloads["/mmz4281/1718/F1.csv"] == 2
+    assert downloads[f"/mmz4281/{season_code(FIRST_SEASON)}/F1.csv"] == 1
+    assert downloads[f"/mmz4281/{season_code(FIRST_SEASON + 1)}/F1.csv"] == 2
     assert len(requests) == 3 * len(LEAGUE_FILES)
 
 
 def test_load_history_includes_the_season_under_way(tmp_path: Path) -> None:
     for competition in LEAGUE_FILES:
-        for season_start in [2016, 2017]:
+        for season_start in [FIRST_SEASON, FIRST_SEASON + 1]:
             csv = NEW_FORMAT_CSV.replace("15/08/2025", f"15/08/{season_start}")
             raw_csv_path(tmp_path, competition, season_start).write_text(csv, encoding="utf-8")
 
-    history = load_history(tmp_path, date(2017, 10, 1))
+    history = load_history(tmp_path, SECOND_SEASON_UNDER_WAY)
 
-    assert sorted(history["season"].unique()) == [2016, 2017]
+    assert sorted(history["season"].unique()) == [FIRST_SEASON, FIRST_SEASON + 1]
 
 
 def http_without_season(missing_code: str) -> httpx.Client:
@@ -189,23 +192,26 @@ def http_without_season(missing_code: str) -> httpx.Client:
 def test_download_history_skips_the_season_under_way_until_it_is_published(
     tmp_path: Path,
 ) -> None:
-    # On 2017-08-05, 2017-18 has started but football-data.co.uk has no file for it yet.
-    download_history(http_without_season("1718"), tmp_path, date(2017, 8, 5))
+    download_history(
+        http_without_season(season_code(FIRST_SEASON + 1)), tmp_path, SECOND_SEASON_UNPUBLISHED
+    )
 
-    assert raw_csv_path(tmp_path, "FL1", 2016).exists()
-    assert not raw_csv_path(tmp_path, "FL1", 2017).exists()
+    assert raw_csv_path(tmp_path, "FL1", FIRST_SEASON).exists()
+    assert not raw_csv_path(tmp_path, "FL1", FIRST_SEASON + 1).exists()
 
 
 def test_download_history_still_fails_when_a_finished_season_is_missing(tmp_path: Path) -> None:
     with pytest.raises(httpx.HTTPStatusError):
-        download_history(http_without_season("1617"), tmp_path, date(2017, 8, 5))
+        download_history(
+            http_without_season(season_code(FIRST_SEASON)), tmp_path, SECOND_SEASON_UNPUBLISHED
+        )
 
 
 def test_load_history_skips_the_season_under_way_until_it_is_published(tmp_path: Path) -> None:
     for competition in LEAGUE_FILES:
-        csv = NEW_FORMAT_CSV.replace("15/08/2025", "15/08/2016")
-        raw_csv_path(tmp_path, competition, 2016).write_text(csv, encoding="utf-8")
+        csv = NEW_FORMAT_CSV.replace("15/08/2025", f"15/08/{FIRST_SEASON}")
+        raw_csv_path(tmp_path, competition, FIRST_SEASON).write_text(csv, encoding="utf-8")
 
-    history = load_history(tmp_path, date(2017, 8, 5))
+    history = load_history(tmp_path, SECOND_SEASON_UNPUBLISHED)
 
-    assert list(history["season"].unique()) == [2016]
+    assert list(history["season"].unique()) == [FIRST_SEASON]

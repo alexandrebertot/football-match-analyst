@@ -8,7 +8,8 @@ BASE_URL = "https://football-data.co.uk/mmz4281"
 RAW_DATA_DIR = Path("data/raw")
 LEAGUE_FILES = {"PL": "E0", "FL1": "F1", "BL1": "D1", "SA": "I1", "PD": "SP1"}
 # Start year of the first season downloaded; dataset configs choose their seasons from there on.
-FIRST_SEASON = 2016
+# Older files miss shot statistics in some leagues and hold malformed lines.
+FIRST_SEASON = 2007
 # football-data.co.uk columns we keep, renamed. Odds are closing odds (just before kick-off).
 COLUMNS = {
     "Date": "date",
