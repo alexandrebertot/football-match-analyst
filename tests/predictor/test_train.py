@@ -7,11 +7,14 @@ import yaml
 
 from football_agent.predictor.config import TrainingConfig
 from football_agent.predictor.evaluation import OUTCOMES
-from football_agent.predictor.features import FEATURE_COLUMNS
+from football_agent.predictor.features import FEATURE_COLUMNS, build_features
 from football_agent.predictor.prepare import load_dataset
 from football_agent.predictor.train import (
     EXPERIMENT_NAME,
+    MATCH_COLUMNS,
+    cross_validate,
     feature_importance,
+    fold_parts,
     run_experiment,
     train_model,
 )
@@ -42,6 +45,57 @@ def test_train_model_with_early_stopping_stops_before_the_iteration_limit(
     model = train_model(parts["train"], parts["validation"], config)
 
     assert 0 < model.best_iteration_ < 500
+
+
+def test_fold_parts_keep_the_season_before_the_scored_one_to_stop_the_training() -> None:
+    rows = pd.DataFrame({"season": [2016, 2017, 2018, 2019]})
+
+    fit, stopping, scored = fold_parts(rows, 2019, early_stopping=True)
+
+    assert list(fit["season"]) == [2016, 2017]
+    assert list(stopping["season"]) == [2018]
+    assert list(scored["season"]) == [2019]
+
+
+def test_fold_parts_without_early_stopping_fit_on_every_earlier_season() -> None:
+    rows = pd.DataFrame({"season": [2016, 2017, 2018, 2019]})
+
+    fit, stopping, scored = fold_parts(rows, 2019, early_stopping=False)
+
+    assert list(fit["season"]) == [2016, 2017, 2018]
+    assert stopping.empty
+    assert list(scored["season"]) == [2019]
+
+
+def test_cross_validate_scores_every_match_of_the_validation_seasons(
+    league: pd.DataFrame, training_config: TrainingConfig
+) -> None:
+    rows = build_features(league, window=5)
+
+    scores = cross_validate(rows, range(2018, 2020), training_config)
+
+    assert len(scores) == (rows["season"] >= 2018).sum()
+    assert list(scores.columns) == [*MATCH_COLUMNS, "log_loss", "naive_log_loss", "market_log_loss"]
+    assert (scores[["log_loss", "naive_log_loss", "market_log_loss"]] > 0).all().all()
+
+
+def test_cross_validate_never_learns_from_a_later_season(
+    league: pd.DataFrame, training_config: TrainingConfig
+) -> None:
+    config = training_config.model_copy(deep=True)
+    config.model.n_estimators = 500
+    config.training.early_stopping_rounds = 5
+    rows = build_features(league, window=5)
+    later_changed = rows.copy()
+    later_changed.loc[later_changed["season"] == 2019, "result"] = "H"
+
+    scores = cross_validate(rows, range(2018, 2020), config)
+    scores_with_later_changed = cross_validate(later_changed, range(2018, 2020), config)
+
+    pd.testing.assert_frame_equal(
+        scores[scores["season"] == 2018],
+        scores_with_later_changed[scores_with_later_changed["season"] == 2018],
+    )
 
 
 def test_feature_importance_gives_split_and_gain_for_every_feature(

@@ -10,10 +10,18 @@ import pandas as pd
 from lightgbm import LGBMClassifier
 
 from football_agent.predictor.config import TrainingConfig, load_training_config
-from football_agent.predictor.evaluation import OUTCOMES, compare_with_baselines
+from football_agent.predictor.evaluation import (
+    OUTCOMES,
+    compare_with_baselines,
+    market_probabilities,
+    match_log_losses,
+    naive_probabilities,
+)
 from football_agent.predictor.prepare import PROCESSED_DATA_DIR, load_dataset
 
 EXPERIMENT_NAME = "match-outcome"
+# What identifies a scored match, so that two runs can be compared match by match.
+MATCH_COLUMNS = ["season", "date", "home_team", "away_team", "result"]
 
 
 def train_model(
@@ -37,6 +45,46 @@ def train_model(
     if len(model.classes_) != len(OUTCOMES):
         raise ValueError(f"Training data covers only classes {list(model.classes_)}.")
     return model
+
+
+def fold_parts(
+    rows: pd.DataFrame, season: int, early_stopping: bool
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Split `rows` for the fold that scores `season`: the matches to fit on, the matches that
+    stop the training, and the matches scored.
+
+    With early stopping, the season just before `season` stops the training, so that the scored
+    season never chooses the number of trees.
+    """
+    scored = rows[rows["season"] == season]
+    if not early_stopping:
+        return rows[rows["season"] < season], rows.iloc[:0], scored
+    return rows[rows["season"] < season - 1], rows[rows["season"] == season - 1], scored
+
+
+def cross_validate(
+    rows: pd.DataFrame, validation_seasons: range, config: TrainingConfig
+) -> pd.DataFrame:
+    """Score every match of `validation_seasons`, each season with a model trained on the seasons
+    before it, along with the naive and market baselines.
+
+    Returns one row per scored match: its season, date, teams and result, then the log-loss of the
+    model, of the naive baseline and of the market.
+    """
+    early_stopping = config.training.early_stopping_rounds is not None
+    folds = []
+    for season in validation_seasons:
+        fit, stopping, scored = fold_parts(rows, season, early_stopping)
+        model = train_model(fit, stopping, config)
+        results = scored["result"]
+        folds.append(
+            scored[MATCH_COLUMNS].assign(
+                log_loss=match_log_losses(model.predict_proba(scored[config.features]), results),
+                naive_log_loss=match_log_losses(naive_probabilities(fit, len(scored)), results),
+                market_log_loss=match_log_losses(market_probabilities(scored), results),
+            )
+        )
+    return pd.concat(folds, ignore_index=True)
 
 
 def feature_importance(model: LGBMClassifier) -> dict[str, dict[str, float]]:
