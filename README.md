@@ -39,9 +39,10 @@ and each tool call with its arguments and result.
 
 ## Match predictor
 
-**Data.** Results, shot statistics and closing odds of the top 5 leagues since 2016-17, from
-[football-data.co.uk](https://www.football-data.co.uk). There is no such history for the Champions
-League, hence no predictions for it.
+**Data.** Results, shot statistics and closing odds of the top 5 leagues since 2007-08, from
+[football-data.co.uk](https://www.football-data.co.uk). The model trains from 2016-17 on: the older
+seasons did not help it (see below). There is no such history for the Champions League, hence no
+predictions for it.
 
 **Features.** Each team's average over its previous 5 matches: points, shots on target, shots on
 target conceded. Each match only sees the matches played before it, and predictions go through the
@@ -68,6 +69,11 @@ It closes 45% of the gap between the naive baseline and the closing odds in cros
 before the cross-validation existed; it is now the baseline that new features must beat. Beating
 the odds is not expected: they include team news, injuries and line-ups that match statistics do
 not.
+
+**What did not help.** Training from 2007-08 instead of 2016-17 lowers the log-loss by 0.0024 ±
+0.0034 per match, almost all of it on 2023-24. Weighing each season half as much as the one five
+seasons after it lowers it by 0.0023 ± 0.0028, this time on all three seasons. Both are rejected:
+with about 5,400 matches scored, a gain below about 0.003 per match cannot be told apart from noise.
 
 **Tracking.** Datasets and training runs are described by YAML configs in [`configs/`](configs).
 Each run is tracked in MLflow, and the chosen one is registered as the `champion` version of the
