@@ -53,6 +53,9 @@ notebooks/         # exploration only, never imported by src/
 - Predictor dataset: `uv run python -m football_agent.predictor.prepare --config configs/datasets/<name>.yaml`
   (rerun it after any change to the feature code: training reads the saved Parquet files)
 - Predictor training: `uv run python -m football_agent.predictor.train --config configs/training/<name>.yaml`
+  (scores each validation season of the dataset with a model trained on the seasons before it,
+  early stopping on the season just before; then trains the model to keep the same way, as if it
+  were to score the first test season. Configs are compared on `cv_log_loss`)
 - Predictor champion: `uv run python -m football_agent.predictor.registry --run <run name>`
   (registers the latest run with that name as a new version of `match-outcome` and moves the
   `champion` alias to it; the agent always loads `models:/match-outcome@champion`)

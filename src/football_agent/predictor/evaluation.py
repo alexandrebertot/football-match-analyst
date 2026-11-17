@@ -71,16 +71,16 @@ def summarize_folds(scores: pd.DataFrame) -> dict[str, float]:
 
 
 def compare_with_baselines(
-    probabilities: np.ndarray, train: pd.DataFrame, matches: pd.DataFrame
+    probabilities: np.ndarray, before: pd.DataFrame, matches: pd.DataFrame
 ) -> dict[str, float]:
     """Score a model's `probabilities` on `matches`, along with the naive and market baselines.
 
-    The naive baseline uses the outcome frequencies of `train`, the seasons the model learned from.
+    The naive baseline uses the outcome frequencies of `before`, the seasons before `matches`.
     """
     results = matches["result"]
     return {
         **evaluate(probabilities, results),
-        "naive_log_loss": evaluate(naive_probabilities(train, len(matches)), results)["log_loss"],
+        "naive_log_loss": evaluate(naive_probabilities(before, len(matches)), results)["log_loss"],
         "market_log_loss": evaluate(market_probabilities(matches), results)["log_loss"],
     }
 

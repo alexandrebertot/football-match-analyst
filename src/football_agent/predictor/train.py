@@ -67,7 +67,8 @@ def cross_validate(
     rows: pd.DataFrame, validation_seasons: range, config: TrainingConfig
 ) -> pd.DataFrame:
     """Score every match of `validation_seasons`, each season with a model trained on the seasons
-    before it, along with the naive and market baselines.
+    before it, along with the market and the naive baseline (the outcome frequencies of every
+    season before it).
 
     Returns one row per scored match: its season, date, teams and result, then the log-loss of the
     model, of the naive baseline and of the market.
@@ -81,7 +82,9 @@ def cross_validate(
         folds.append(
             scored[MATCH_COLUMNS].assign(
                 log_loss=match_log_losses(model.predict_proba(scored[config.features]), results),
-                naive_log_loss=match_log_losses(naive_probabilities(fit, len(scored)), results),
+                naive_log_loss=match_log_losses(
+                    naive_probabilities(rows[rows["season"] < season], len(scored)), results
+                ),
                 market_log_loss=match_log_losses(market_probabilities(scored), results),
             )
         )
