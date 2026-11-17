@@ -5,6 +5,7 @@ import mlflow.lightgbm
 import yaml
 from lightgbm import LGBMClassifier
 from mlflow import MlflowClient
+from mlflow.entities import Run
 from mlflow.entities.model_registry import ModelVersion
 
 from football_agent.predictor.config import DatasetConfig
@@ -14,8 +15,8 @@ MODEL_NAME = "match-outcome"
 CHAMPION_ALIAS = "champion"
 
 
-def promote_run(run_name: str) -> ModelVersion:
-    """Register the model of the latest run named `run_name` and make it the champion."""
+def latest_run(run_name: str) -> Run:
+    """Return the latest training run named `run_name`."""
     runs = mlflow.search_runs(
         experiment_names=[EXPERIMENT_NAME],
         filter_string=f"attributes.run_name = '{run_name}'",
@@ -25,8 +26,13 @@ def promote_run(run_name: str) -> ModelVersion:
     )
     if not runs:
         raise ValueError(f"No run named '{run_name}' in experiment '{EXPERIMENT_NAME}'.")
+    return runs[0]
+
+
+def promote_run(run_name: str) -> ModelVersion:
+    """Register the model of the latest run named `run_name` and make it the champion."""
     # MLflow 3 stores a logged model as its own entity, linked to the run that produced it.
-    model_id = runs[0].outputs.model_outputs[0].model_id
+    model_id = latest_run(run_name).outputs.model_outputs[0].model_id
     version = mlflow.register_model(f"models:/{model_id}", MODEL_NAME)
     MlflowClient().set_registered_model_alias(MODEL_NAME, CHAMPION_ALIAS, version.version)
     return version
