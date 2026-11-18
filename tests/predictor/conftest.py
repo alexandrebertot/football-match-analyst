@@ -22,6 +22,7 @@ def league() -> pd.DataFrame:
             games.append(
                 {
                     "date": pd.Timestamp(f"{season}-08-01") + pd.Timedelta(days=7 * day),
+                    "competition": "FL1",
                     "season": season,
                     "home_team": home,
                     "away_team": away,

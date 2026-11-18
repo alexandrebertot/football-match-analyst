@@ -3,15 +3,20 @@ import pandas as pd
 import pytest
 
 from football_agent.predictor.features import (
+    AVERAGE_COLUMNS,
+    ELO_INITIAL,
     FEATURE_COLUMNS,
     add_rolling_means,
     build_features,
+    elo_ratings,
+    expected_home_score,
     team_match_rows,
 )
 
 
-def make_matches(games: list[tuple[str, str, str, int, int]]) -> pd.DataFrame:
-    """Build a matches table from (date, home team, away team, home goals, away goals).
+def make_matches(games: list[tuple[str, str, str, float, float]]) -> pd.DataFrame:
+    """Build a matches table of one Ligue 1 season from (date, home team, away team, home goals,
+    away goals).
 
     Shots on target are set to goals + 3, which keeps hand-computed averages easy.
     """
@@ -19,6 +24,8 @@ def make_matches(games: list[tuple[str, str, str, int, int]]) -> pd.DataFrame:
         games, columns=["date", "home_team", "away_team", "home_goals", "away_goals"]
     )
     return matches.assign(
+        competition="FL1",
+        season=2026,
         date=pd.to_datetime(matches["date"]),
         home_shots_on_target=matches["home_goals"] + 3.0,
         away_shots_on_target=matches["away_goals"] + 3.0,
@@ -81,7 +88,7 @@ def test_build_features_puts_each_team_average_on_its_side() -> None:
     second = features.iloc[1]
     assert (second["home_points_avg"], second["away_points_avg"]) == (0.0, 3.0)
     assert (second["home_goals_against_avg"], second["away_goals_against_avg"]) == (2.0, 0.0)
-    assert features.iloc[0][FEATURE_COLUMNS].isna().all()
+    assert features.iloc[0][AVERAGE_COLUMNS].isna().all()
 
 
 def test_features_of_a_match_never_depend_on_its_result_or_later_ones() -> None:
@@ -114,3 +121,74 @@ def test_features_of_a_match_never_depend_on_its_result_or_later_ones() -> None:
         assert not before.loc[~earlier_or_same_day, column].equals(
             after.loc[~earlier_or_same_day, column]
         ), column
+
+
+def test_expected_home_score_includes_the_home_advantage() -> None:
+    assert expected_home_score(1500, 1500) == pytest.approx(0.5855, abs=1e-4)
+    assert expected_home_score(1500, 1560) == pytest.approx(0.5)
+
+
+def test_elo_ratings_move_by_k_times_the_surprise_and_sum_to_zero() -> None:
+    matches = make_matches(
+        [
+            ("2026-08-01", "PSG", "Lyon", 2, 0),
+            ("2026-08-08", "Lyon", "PSG", 1, 1),
+        ]
+    )
+
+    ratings = elo_ratings(matches)
+
+    assert ratings.iloc[0].tolist() == [ELO_INITIAL, ELO_INITIAL]
+    # PSG was expected to score 0.5855 at home and scored 1: 15 * (1 - 0.5855) = 6.2175.
+    assert ratings.iloc[1].tolist() == pytest.approx([1493.7825, 1506.2175], abs=1e-4)
+
+
+def test_elo_ratings_give_a_match_without_a_season_the_latest_ratings() -> None:
+    played = make_matches([("2026-08-01", "PSG", "Lyon", 2, 0)])
+    upcoming = pd.DataFrame([{"home_team": "Lyon", "away_team": "PSG"}])
+
+    ratings = elo_ratings(pd.concat([played, upcoming], ignore_index=True))
+
+    assert ratings.iloc[1].tolist() == pytest.approx([1493.7825, 1506.2175], abs=1e-4)
+
+
+def test_elo_ratings_start_promoted_teams_at_the_mean_of_the_departed_ones() -> None:
+    first_season = make_matches(
+        [
+            ("2025-08-01", "PSG", "Lyon", 3, 0),
+            ("2025-08-08", "Lyon", "Metz", 2, 0),
+            ("2025-08-15", "Metz", "PSG", 0, 1),
+        ]
+    ).assign(season=2025)
+    second_season = make_matches(
+        [
+            ("2026-08-01", "Lens", "PSG", 0, 0),
+            ("2026-08-08", "Lyon", "Lens", 1, 1),
+        ]
+    )
+    after_first_season = elo_ratings(
+        pd.concat(
+            [first_season, pd.DataFrame([{"home_team": "Metz", "away_team": "PSG"}])],
+            ignore_index=True,
+        )
+    ).iloc[-1]
+
+    ratings = elo_ratings(pd.concat([first_season, second_season], ignore_index=True))
+
+    # Metz is the only team that left the league: Lens starts at Metz's last rating.
+    assert ratings.iloc[3].tolist() == pytest.approx(after_first_season.tolist())
+    assert after_first_season["home_elo"] < ELO_INITIAL
+
+
+def test_elo_ratings_change_nothing_for_a_match_without_a_score() -> None:
+    matches = make_matches(
+        [
+            ("2026-08-01", "PSG", "Lyon", 2, 0),
+            ("2026-08-08", "Lyon", "PSG", np.nan, np.nan),
+            ("2026-08-15", "Lyon", "PSG", 1, 1),
+        ]
+    )
+
+    ratings = elo_ratings(matches)
+
+    assert ratings.iloc[2].tolist() == ratings.iloc[1].tolist()

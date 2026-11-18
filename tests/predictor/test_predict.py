@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from football_agent.predictor.config import TrainingConfig
-from football_agent.predictor.features import FEATURE_COLUMNS, STATS, build_features
+from football_agent.predictor.features import FEATURE_COLUMNS, build_features
 from football_agent.predictor.predict import (
     STAT_LABELS,
     MatchPredictor,
@@ -85,8 +85,10 @@ def test_predict_turns_missing_history_into_null_statistics(predictor: MatchPred
     assert prediction["recent_form"]["Olympique Lyon"]["points_per_match"] is not None
 
 
-def test_every_statistic_has_a_name_for_the_llm() -> None:
-    assert set(STAT_LABELS) == set(STATS)
+def test_every_feature_has_a_name_for_the_llm() -> None:
+    stats = {name.removesuffix("_avg").split("_", 1)[1] for name in FEATURE_COLUMNS}
+
+    assert set(STAT_LABELS) == stats
 
 
 def test_readable_form_groups_features_by_team_under_explicit_names() -> None:

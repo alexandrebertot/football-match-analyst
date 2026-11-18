@@ -19,6 +19,7 @@ STAT_LABELS = {
     "goals_against": "goals_conceded_per_match",
     "shots_on_target_for": "shots_on_target_per_match",
     "shots_on_target_against": "shots_on_target_conceded_per_match",
+    "elo": "elo_rating",
 }
 
 
