@@ -41,12 +41,16 @@ and each tool call with its arguments and result.
 
 **Data.** Results, shot statistics and closing odds of the top 5 leagues since 2007-08, from
 [football-data.co.uk](https://www.football-data.co.uk). The model trains from 2016-17 on: the older
-seasons did not help it (see below). There is no such history for the Champions League, hence no
-predictions for it.
+seasons did not help it as training data (see below), but they warm up the Elo ratings. There is no
+such history for the Champions League, hence no predictions for it.
 
-**Features.** Each team's average over its previous 5 matches: points, shots on target, shots on
-target conceded. Each match only sees the matches played before it, and predictions go through the
-same feature code as training.
+**Features.** Each team's average over its previous 5 matches (points, shots on target, shots on
+target conceded) and its Elo rating. After every match since 2007-08, each team gains or loses 15
+times the gap between its result (1, 0.5 or 0) and the result its rating predicted, the home team
+getting a 60-point advantage; both values minimise the rating's own error on 2010-11 to 2018-19,
+seasons that no fold scores. A promoted team starts at the mean rating of the teams relegated, which
+keeps each league's mean at 1500. Each match only sees the matches played before it, and predictions
+go through the same feature code as training.
 
 **Split.** By whole seasons, in time order. Configs are compared by cross-validation: each season
 from 2021-22 to 2023-24 is predicted by a model trained on the seasons before it, the season just
@@ -61,6 +65,7 @@ confidence interval of the difference below zero.
 | --- | --- | --- |
 | Naive: outcome frequencies of the earlier seasons | 1.0725 | 1.0750 |
 | **LightGBM champion, 6 features** | 1.0255 | **1.0285** |
+| Candidate: champion features + Elo ratings | 0.9921 | not scored yet |
 | Bookmakers' closing odds | 0.9684 | 0.9691 |
 
 It closes 45% of the gap between the naive baseline and the closing odds in cross-validation, and
@@ -69,6 +74,12 @@ It closes 45% of the gap between the naive baseline and the closing odds in cros
 before the cross-validation existed; it is now the baseline that new features must beat. Beating
 the odds is not expected: they include team news, injuries and line-ups that match statistics do
 not.
+
+**The Elo ratings** lower the log-loss by 0.0334 ± 0.0075 per match, by about as much on each of the
+three seasons, and close 77% of the gap: the 5-match averages miss the long-term strength of a team
+and of its opponents. The ratings bring two thirds of the trees' gain. The candidate is the baseline
+of the next steps. Until the last one, the API keeps the champion and the test seasons stay
+unscored.
 
 **What did not help.** Training from 2007-08 instead of 2016-17 lowers the log-loss by 0.0024 ±
 0.0034 per match, almost all of it on 2023-24. Weighing each season half as much as the one five
@@ -137,9 +148,9 @@ once.
 - [ ] **Better agent**: system prompt and tool outputs, each change measured by the evaluation
 - [ ] **Online demo**: the chat page hosted publicly with the fine-tuned model
 - [ ] **Better predictor**, each step judged by the cross-validation: history back to 2007-08
-  with recent seasons weighted more, an Elo rating, less weight on the matches played without
-  fans, recency-weighted form, shots and corners, hyperparameter tuning, then a final score on
-  the held-out test seasons
+  and recent seasons weighted more (both rejected), an Elo rating (kept), then less weight on the
+  matches played without fans, recency-weighted form, shots and corners, hyperparameter tuning,
+  and a final score on the held-out test seasons
 - [ ] **Team names**: map the teams of the two data sources automatically, from the matches they
   share, instead of by hand each season
 

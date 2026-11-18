@@ -1,0 +1,18 @@
+# last5 loaded from 2007-08 so that the Elo ratings are settled when training starts in 2016-17:
+# same matches and the same split as last5.
+name: last5-elo
+seasons:            # start years, both ends included: 2007-08 to 2025-26
+  first: 2007
+  last: 2025
+split:
+  train:            # only ever trained on
+    first: 2016
+    last: 2020
+  validation:       # each season is scored by a model trained on the seasons before it
+    first: 2021
+    last: 2023
+  test:
+    first: 2024
+    last: 2025
+features:
+  form_window: 5
